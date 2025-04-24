@@ -32,10 +32,10 @@ news_events = {
 }
 
 # --- Streamlit Setup ---
-st.set_page_config(page_title="Forex By Me", layout="wide")
+st.set_page_config(page_title="Forex By Imtiaz & Haris", layout="wide")
 st.markdown("""
     <style>body, html, .block-container, .stMarkdown, .stTable, table td, table th {font-size: 20px !important;}</style>
-    <h1 style='text-align: center; color:#007acc;'>📊 <b>Forex By Me (5min)</b></h1>
+    <h1 style='text-align: center; color:#007acc;'>📊 <b>Forex By Imtiaz & Haris (5min)</b></h1>
 """, unsafe_allow_html=True)
 st.caption("Includes RSI + Price Divergence (Always), and confirms with: MACD, EMA, Volume, Candlestick, ADX")
 
