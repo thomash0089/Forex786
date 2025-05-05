@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | Volume Spike Fixed) ---
+# --- Signals with H & I (15-Min Timeframe | Final Version with Fixes) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -153,6 +153,7 @@ def detect_trend_reversal(df):
         return "Reversal Forming Bearish"
     return ""
 
+# --------------------- Build Table Rows ---------------------
 rows = []
 for label, symbol in symbols.items():
     df = fetch_data(symbol)
@@ -196,7 +197,7 @@ for label, symbol in symbols.items():
             "AI Suggestion": ai, "Advice": advice, "News Alert": check_news_alert(label)
         })
 
-# Table Display
+# --------------------- Table Display ---------------------
 column_order = [
     "Pair", "Price", "RSI", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Volume Spike", "AI Suggestion", "Advice", "News Alert"
@@ -231,23 +232,24 @@ def trend_color_text(trend):
     color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "gray"
     return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
 
-df_sorted = pd.DataFrame(rows).sort_values(by="Pair", na_position='last')
-
-for _, row in df_sorted.iterrows():
-    style = style_row(row)
-    styled_html += f"<tr style='{style}'>"
-    for col in column_order:
-        val = row[col]
-        if col == "Pair":
-            val = f"<strong style='font-size: 18px;'>{val}</strong>"
-        elif col == "Trend":
-            val = trend_color_text(val)
-        styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
-    styled_html += "</tr>"
-styled_html += "</table>"
-
-st.markdown(styled_html, unsafe_allow_html=True)
-st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-st.text(f"Scanned Pairs: {len(rows)}")
-strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
-st.text(f"Strong Signals Found: {len(strongs)}")
+if rows:
+    df_sorted = pd.DataFrame(rows).sort_values(by="Pair", na_position='last')
+    for _, row in df_sorted.iterrows():
+        style = style_row(row)
+        styled_html += f"<tr style='{style}'>"
+        for col in column_order:
+            val = row[col]
+            if col == "Pair":
+                val = f"<strong style='font-size: 18px;'>{val}</strong>"
+            elif col == "Trend":
+                val = trend_color_text(val)
+            styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
+        styled_html += "</tr>"
+    styled_html += "</table>"
+    st.markdown(styled_html, unsafe_allow_html=True)
+    st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.text(f"Scanned Pairs: {len(rows)}")
+    strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
+    st.text(f"Strong Signals Found: {len(strongs)}")
+else:
+    st.warning("⚠️ No valid signals found or API data error.")
