@@ -232,6 +232,11 @@ for label, symbol in symbols.items():
                 candle_age = len(df) - highs[-1]
         else:
             candle_age = ""
+        # 🚫 Skip old signals
+        if candle_age != "" and int(candle_age) > 2:
+            direction = ""
+            ai_suggestion = ""
+
 
         pattern = detect_candle_pattern(df)
         candle_pattern = pattern if pattern else "—"
