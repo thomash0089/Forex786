@@ -225,10 +225,19 @@ for label, symbol in symbols.items():
 
         tf_status = get_tf_confirmation(symbol)
 
-        signal_time = pd.to_datetime(df.index[-1])
-        now = datetime.now()
-        age_minutes = int((now - signal_time).total_seconds() / 60)
-        age_minutes = max(0, age_minutes)
+        # 🕓 Calculate Candle Age (how many candles ago the divergence low/high occurred)
+candle_age = ""
+if direction == "Bullish":
+    lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
+    if len(lows) >= 2:
+        candle_age = len(df) - lows[-1]
+elif direction == "Bearish":
+    highs = argrelextrema(df['close'].values, np.greater_equal, order=3)[0]
+    if len(highs) >= 2:
+        candle_age = len(df) - highs[-1]
+else:
+    candle_age = ""
+
 
         pattern = detect_candle_pattern(df)
         candle_pattern = pattern if pattern else "—"
