@@ -167,7 +167,7 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
 
 def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
     if not divergence:
-        return "No signal detected — wait"
+        return "No signal"
     if trend != divergence:
         if "Strong" in ai_suggestion and "Confirm" in tf_confirm:
             return f"WARNING: {divergence} signal forming, but trend is {trend} — early entry possible"
