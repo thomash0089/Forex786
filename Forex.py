@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | Final Clean Version) ---
+# --- Signals with H & I (15-Min Timeframe | Final Fixed Version) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -172,7 +172,7 @@ def check_news_alert(pair):
             continue
     return " | ".join(alert_list) if alert_list else ""
 
-# ---------------- Generate Table Rows ---------------- #
+# ---------------- Table Rows ---------------- #
 rows = []
 for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
@@ -190,7 +190,8 @@ for label, symbol in symbols.items():
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
 
-        signal_time = df.index[-1].tz_localize('UTC').tz_convert('Asia/Karachi')
+        # ✅ Corrected signal age logic
+        signal_time = df.index[-1].replace(tzinfo=timezone('Asia/Karachi'))
         now = datetime.now(timezone('Asia/Karachi'))
         age_minutes = int((now - signal_time).total_seconds() / 60)
 
@@ -252,14 +253,14 @@ def style_row(row):
         pd.notna(ai) and "Confidence: Strong" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #add8e6;'  # Blue
+        return 'background-color: #add8e6;'  # Light blue for strong match
     if (
         pd.notna(ai) and "Confidence: Medium" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #ccffcc;'  # Light Green
+        return 'background-color: #ccffcc;'  # Light green for medium match
     if "Reversal" in row['Reversal Signal']:
-        return 'background-color: #fff0b3;'  # Yellow
+        return 'background-color: #fff0b3;'  # Yellow for reversal
     return ''
 
 def trend_color_text(trend):
@@ -282,7 +283,7 @@ for _, row in df_sorted.iterrows():
     styled_html += "</tr>"
 styled_html += "</table>"
 
-# Show table + summary
+# ✅ Final display
 st.markdown(styled_html, unsafe_allow_html=True)
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
