@@ -5,4 +5,3 @@ numpy
 scipy
 streamlit-autorefresh
 pytz
-TA-Lib
