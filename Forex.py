@@ -283,9 +283,9 @@ for label, symbol in symbols.items():
         st.text(f"{label} | Dir: {direction} | RSI: {df['RSI'].iloc[-1]:.2f} | Vol Spike: {volume_spike}")
      
         if direction == "Bullish" and "Forming" in reversal:
-    direction = ""
-if direction == "Bearish" and "Forming" in reversal:
-    direction = ""
+            direction = ""
+        if direction == "Bearish" and "Forming" in reversal:
+            direction = ""
         tf_status = get_tf_confirmation(symbol)
 
         # 🕓 Candle Age
