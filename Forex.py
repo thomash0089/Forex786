@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Pattern Column Added) ---
+# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Safe Filters) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -28,7 +28,7 @@ news_events = {
     "XAU/USD": [{"time": "13:30", "title": "Gold Reserve Report"}],
     "WTI/USD": [{"time": "12:30", "title": "Crude Oil Inventory"}],
     "EUR/JPY": [{"time": "09:00", "title": "ECB Bulletin"}],
-    "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
+    "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}]
 }
 
 def fetch_data(symbol, interval="15min", outputsize=200):
@@ -43,7 +43,33 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     df.set_index("datetime", inplace=True)
     df = df.astype(float).sort_index()
     return df
-# --------- Indicator Calculations ---------
+
+# --------- Trend Reversal & TF Confirmation ---------
+def detect_trend_reversal(df):
+    if len(df) < 3:
+        return ""
+    e9 = df['EMA9'].iloc[-3:]
+    e20 = df['EMA20'].iloc[-3:]
+    if e9[0] < e20[0] and e9[1] > e20[1] and e9[2] > e20[2]:
+        return "Reversal Confirmed Bullish"
+    elif e9[0] > e20[0] and e9[1] < e20[1] and e9[2] < e20[2]:
+        return "Reversal Confirmed Bearish"
+    elif e9[-2] < e20[-2] and e9[-1] > e20[-1]:
+        return "Reversal Forming Bullish"
+    elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
+        return "Reversal Forming Bearish"
+    return ""
+
+def get_tf_confirmation(symbol):
+    for tf in ["5min", "15min", "1h"]:
+        df = fetch_data(symbol, interval=tf)
+        if df is not None:
+            dir = detect_divergence_direction(df)
+            if dir:
+                return f"Confirm {dir}"
+    return ""
+
+# --------- Indicators ---------
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = delta.where(delta > 0, 0)
@@ -64,12 +90,9 @@ def calculate_ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
 
 def calculate_adx(df, period=14):
-    df['TR'] = np.maximum(df['high'] - df['low'],
-                 np.maximum(abs(df['high'] - df['close'].shift()), abs(df['low'] - df['close'].shift())))
-    df['+DM'] = np.where((df['high'] - df['high'].shift()) > (df['low'].shift() - df['low']),
-                         np.maximum(df['high'] - df['high'].shift(), 0), 0)
-    df['-DM'] = np.where((df['low'].shift() - df['low']) > (df['high'] - df['high'].shift()),
-                         np.maximum(df['low'].shift() - df['low'], 0), 0)
+    df['TR'] = np.maximum(df['high'] - df['low'], np.maximum(abs(df['high'] - df['close'].shift()), abs(df['low'] - df['close'].shift())))
+    df['+DM'] = np.where((df['high'] - df['high'].shift()) > (df['low'].shift() - df['low']), np.maximum(df['high'] - df['high'].shift(), 0), 0)
+    df['-DM'] = np.where((df['low'].shift() - df['low']) > (df['high'] - df['high'].shift()), np.maximum(df['low'].shift() - df['low'], 0), 0)
     tr14 = df['TR'].rolling(window=period).mean()
     plus_dm14 = df['+DM'].rolling(window=period).mean()
     minus_dm14 = df['-DM'].rolling(window=period).mean()
@@ -86,6 +109,69 @@ def calculate_atr(df, period=14):
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     atr = tr.rolling(window=period).mean()
     return atr
+# --------- Trend Reversal & TF Confirmation ---------
+def detect_trend_reversal(df):
+    if len(df) < 3:
+        return ""
+    e9 = df['EMA9'].iloc[-3:]
+    e20 = df['EMA20'].iloc[-3:]
+    if e9[0] < e20[0] and e9[1] > e20[1] and e9[2] > e20[2]:
+        return "Reversal Confirmed Bullish"
+    elif e9[0] > e20[0] and e9[1] < e20[1] and e9[2] < e20[2]:
+        return "Reversal Confirmed Bearish"
+    elif e9[-2] < e20[-2] and e9[-1] > e20[-1]:
+        return "Reversal Forming Bullish"
+    elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
+        return "Reversal Forming Bearish"
+    return ""
+
+def get_tf_confirmation(symbol):
+    for tf in ["5min", "15min", "1h"]:
+        df = fetch_data(symbol, interval=tf)
+        if df is not None:
+            dir = detect_divergence_direction(df)
+            if dir:
+                return f"Confirm {dir}"
+    return ""
+
+def calculate_rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+def calculate_macd(series):
+    ema12 = series.ewm(span=12, adjust=False).mean()
+    ema26 = series.ewm(span=26, adjust=False).mean()
+    macd = ema12 - ema26
+    signal = macd.ewm(span=9, adjust=False).mean()
+    return macd, signal
+
+def calculate_ema(series, period):
+    return series.ewm(span=period, adjust=False).mean()
+def calculate_atr(df, period=14):
+    tr1 = df['high'] - df['low']
+    tr2 = abs(df['high'] - df['close'].shift())
+    tr3 = abs(df['low'] - df['close'].shift())
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+    return atr
+
+def calculate_adx(df, period=14):
+    df['TR'] = np.maximum(df['high'] - df['low'], np.maximum(abs(df['high'] - df['close'].shift()), abs(df['low'] - df['close'].shift())))
+    df['+DM'] = np.where((df['high'] - df['high'].shift()) > (df['low'].shift() - df['low']), np.maximum(df['high'] - df['high'].shift(), 0), 0)
+    df['-DM'] = np.where((df['low'].shift() - df['low']) > (df['high'] - df['high'].shift()), np.maximum(df['low'].shift() - df['low'], 0), 0)
+    tr14 = df['TR'].rolling(window=period).mean()
+    plus_dm14 = df['+DM'].rolling(window=period).mean()
+    minus_dm14 = df['-DM'].rolling(window=period).mean()
+    plus_di14 = 100 * (plus_dm14 / tr14)
+    minus_di14 = 100 * (minus_dm14 / tr14)
+    dx = 100 * abs(plus_di14 - minus_di14) / (plus_di14 + minus_di14)
+    adx = dx.rolling(window=period).mean()
+    return adx
 
 def detect_volume_spike(df):
     if 'volume' not in df.columns or len(df) < 11:
@@ -93,7 +179,7 @@ def detect_volume_spike(df):
     avg_vol = df['volume'].iloc[-11:-1].mean()
     last_vol = df['volume'].iloc[-1]
     return last_vol > 1.5 * avg_vol
-# --------- Candle Pattern Detection ---------
+
 def detect_candle_pattern(df):
     o, c, h, l = df['open'].iloc[-4:], df['close'].iloc[-4:], df['high'].iloc[-4:], df['low'].iloc[-4:]
     current_open = o.iloc[-1]
@@ -120,16 +206,6 @@ def detect_candle_pattern(df):
     if trend_up and body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
         return "Shooting Star"
     return ""
-
-# --------- Custom Pattern Indicator (from uploaded image) ---------
-def detect_named_candle_pattern(df):
-    # Example placeholder logic for new indicator column (you can expand this)
-    pattern = detect_candle_pattern(df)
-    if pattern in ["Doji", "Hammer", "Bullish Engulfing", "Shooting Star", "Bearish Engulfing"]:
-        return pattern
-    return "—"
-
-# --------- Divergence Detection ---------
 def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
     df = df.dropna()
@@ -141,7 +217,7 @@ def detect_divergence_direction(df):
     if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
         return "Bearish"
     return ""
-# --------- AI Suggestion Logic ---------
+
 def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     if not direction:
         return ""
@@ -171,8 +247,20 @@ def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
         else:
             return f"LOW: {trend.lower()} — trend match but weak"
     return "INFO: Analysis unclear"
+def check_news_alert(pair):
+    now = datetime.now(timezone('Asia/Karachi'))
+    alert_list = []
+    for event in news_events.get(pair, []):
+        try:
+            event_time = datetime.strptime(event["time"], "%H:%M").replace(
+                year=now.year, month=now.month, day=now.day, tzinfo=timezone('Asia/Karachi'))
+            if timedelta(0) <= (event_time - now) <= timedelta(minutes=30):
+                alert_list.append(f"{event['title']} @ {event['time']}")
+        except:
+            continue
+    return " | ".join(alert_list) if alert_list else ""
 
-# --------- Table Row Collection ---------
+# ---------------- Table Rows ---------------- #
 rows = []
 for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
@@ -193,13 +281,16 @@ for label, symbol in symbols.items():
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
 
-        if direction == "Bullish" and (df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal):
-            direction = ""
-        if direction == "Bearish" and (df['RSI'].iloc[-1] > 50 or not volume_spike or "Forming" in reversal):
-            direction = ""
+        if direction == "Bullish":
+            if df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal:
+                direction = ""
+        if direction == "Bearish":
+            if df['RSI'].iloc[-1] > 50 or not volume_spike or "Forming" in reversal:
+                direction = ""
 
         tf_status = get_tf_confirmation(symbol)
 
+        # 🕓 Candle Age
         candle_age = ""
         if direction == "Bullish":
             lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
@@ -209,10 +300,11 @@ for label, symbol in symbols.items():
             highs = argrelextrema(df['close'].values, np.greater_equal, order=3)[0]
             if len(highs) >= 2:
                 candle_age = len(df) - highs[-1]
+        else:
+            candle_age = ""
 
         pattern = detect_candle_pattern(df)
-        named_pattern = detect_named_candle_pattern(df)
-
+        candle_pattern = pattern if pattern else "—"
         indicators = []
         if direction:
             indicators.append("RSI")
@@ -253,17 +345,17 @@ for label, symbol in symbols.items():
             "Trend": trend, "Divergence": direction, "TF": tf_status,
             "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators),
-            "Candle Pattern": pattern if pattern else "—",
-            "Named Pattern": named_pattern,
+            "Candle Pattern": candle_pattern,
             "Volume Spike": "Yes" if volume_spike else "No",
-            "Signal Age": f"{candle_age} candles ago" if candle_age else "—",
+            "Candle Age": f"{candle_age} candles ago" if candle_age else "—",
             "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
-# --------- Table Display ---------
+
+# ---------------- Table Display ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
-    "Confirmed Indicators", "Candle Pattern", "Named Pattern", "Volume Spike", "Signal Age",
+    "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Candle Age",
     "AI Suggestion", "Advice", "News Alert"
 ]
 
@@ -272,18 +364,18 @@ styled_html += "<tr>" + "".join([
     f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
     for col in column_order
 ]) + "</tr>"
-
 def style_row(row):
     ai = row['AI Suggestion']
     tf = row['TF']
     trend = row['Trend']
     div = row['Divergence']
-    age = row['Signal Age']
+    age = row['Candle Age']
     try:
         age_minutes = int(age.split()[0])
     except:
         age_minutes = 99
 
+    # ✅ Only highlight signals younger than 2 candles (~<30 minutes)
     if age_minutes <= 30:
         if (
             pd.notna(ai) and "Confidence: Strong" in ai and trend == div
