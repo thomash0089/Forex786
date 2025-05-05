@@ -215,6 +215,12 @@ for label, symbol in symbols.items():
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
 
         direction = detect_divergence_direction(df)
+        if direction:
+        recent = df['RSI'].iloc[-2:]
+        if direction == "Bullish" and all(r < 50 for r in recent):
+        direction = ""
+        if direction == "Bearish" and all(r > 50 for r in recent):
+        direction = ""
         tf_status = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
