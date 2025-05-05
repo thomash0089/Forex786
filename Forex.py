@@ -102,35 +102,20 @@ def detect_candle_pattern(df):
     previous_close = c.iloc[-2]
     upper_wick = current_high - max(current_open, current_close)
     lower_wick = min(current_open, current_close) - current_low
-
-    # ✅ Trend check
     trend_up = c.iloc[0] < c.iloc[1] < c.iloc[2]
     trend_down = c.iloc[0] > c.iloc[1] > c.iloc[2]
 
-    # ✅ Doji: very small body, large wicks
     if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
         return "Doji"
-
-    # ✅ Bullish Engulfing
-    if trend_down and previous_close < previous_open and current_close > current_open and \
-       current_close > previous_open and current_open < previous_close:
+    if trend_down and previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
         return "Bullish Engulfing"
-
-    # ✅ Bearish Engulfing
-    if trend_up and previous_close > previous_open and current_close < current_open and \
-       current_close < previous_open and current_open > previous_close:
+    if trend_up and previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
         return "Bearish Engulfing"
-
-    # ✅ Hammer (usually bottom reversal)
     if trend_down and body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
         return "Hammer"
-
-    # ✅ Shooting Star (usually top reversal)
     if trend_up and body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
         return "Shooting Star"
-
     return ""
-
 
 def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
@@ -174,12 +159,10 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     sl = price * (1 - 0.002) if direction == "Bullish" else price * (1 + 0.002)
     tp = price * (1 + 0.004) if direction == "Bullish" else price * (1 - 0.004)
     count = len(indicators)
-    if count >= 4:
+    if count >= 5:
         confidence = "Strong"
-    elif count == 3:
+    elif count == 4:
         confidence = "Medium"
-    elif count == 2:
-        confidence = "Low"
     else:
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
@@ -228,12 +211,11 @@ for label, symbol in symbols.items():
         price_now = df['close'].iloc[-1]
         atr_value = df['ATR'].iloc[-1]
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
-        
+
         direction = detect_divergence_direction(df)
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
 
-        # ✅ Apply Safe Filters
         if direction == "Bullish":
             if df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal:
                 direction = ""
@@ -251,7 +233,7 @@ for label, symbol in symbols.items():
         pattern = detect_candle_pattern(df)
         candle_pattern = pattern if pattern else "—"
 
-             indicators = []
+        indicators = []
         if direction:
             indicators.append("RSI")
             if direction == "Bullish" and df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
@@ -269,7 +251,6 @@ for label, symbol in symbols.items():
             if direction in pattern:
                 indicators.append("Candle")
 
-            # ❌ Reject weak signals with less than 5 confirmations
             if len(indicators) < 5:
                 direction = ""
                 ai_suggestion = ""
@@ -277,6 +258,12 @@ for label, symbol in symbols.items():
                 ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
         else:
             ai_suggestion = ""
+
+        trend = (
+            "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
+            else "Bearish" if df['EMA9'].iloc[-1] < df['EMA20'].iloc[-1] and price_now < df['EMA9'].iloc[-1]
+            else "Sideways"
+        )
 
         advice = generate_advice(trend, direction, ai_suggestion, tf_status)
 
@@ -292,7 +279,8 @@ for label, symbol in symbols.items():
             "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
-# ---------------- Table Layout & Display ---------------- #
+
+# ---------------- Table Display ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
@@ -314,14 +302,14 @@ def style_row(row):
         pd.notna(ai) and "Confidence: Strong" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #add8e6;'  # Light Blue for Strong match
+        return 'background-color: #add8e6;'  # Light Blue
     if (
         pd.notna(ai) and "Confidence: Medium" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #ccffcc;'  # Light Green for Medium
+        return 'background-color: #ccffcc;'  # Light Green
     if "Reversal" in row['Reversal Signal']:
-        return 'background-color: #fff0b3;'  # Yellow for Reversal Signal
+        return 'background-color: #fff0b3;'  # Yellow
     return ''
 
 def trend_color_text(trend):
@@ -346,7 +334,7 @@ for _, row in df_sorted.iterrows():
 styled_html += "</table>"
 st.markdown(styled_html, unsafe_allow_html=True)
 
-# Footer Info
+# Footer
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
