@@ -326,7 +326,7 @@ for label, symbol in symbols.items():
               direction = detect_divergence_direction(df)
               ...
               indicators = []
-             if direction:
+                 if direction:
                 indicators.append("RSI")
                 ...
             if len(indicators) >= 5:
