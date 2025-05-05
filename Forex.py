@@ -321,14 +321,21 @@ for label, symbol in symbols.items():
             if direction in pattern:
                 indicators.append("Candle")
 
+            if df is not None:
+              ...
+              direction = detect_divergence_direction(df)
+              ...
+              indicators = []
+             if direction:
+                indicators.append("RSI")
+                ...
             if len(indicators) >= 5:
                 ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
-           elif len(indicators) == 4:
-            ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
-           else:
+            elif len(indicators) == 4:
+                ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
+            else:
                 direction = ""
                 ai_suggestion = ""
-
         trend = (
             "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
             else "Bearish" if df['EMA9'].iloc[-1] < df['EMA20'].iloc[-1] and price_now < df['EMA9'].iloc[-1]
