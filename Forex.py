@@ -418,3 +418,41 @@ st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
 st.text(f"Strong Signals Found: {len(strongs)}")
+# ---------------- Candle Pattern Section ---------------- #
+# Detect candle patterns and display separately
+
+candle_pattern_rows = []
+
+for label, symbol in symbols.items():
+    df = fetch_data(symbol, interval="15min")
+    if df is not None:
+        # Detect the current candle pattern for each pair
+        pattern = detect_candle_pattern(df)
+        candle_pattern = pattern if pattern else "—"  # Default to "—" if no pattern detected
+        
+        candle_pattern_rows.append({
+            "Pair": label, 
+            "Candle Pattern": candle_pattern
+        })
+
+# Display the new section (Candle Pattern Table)
+st.markdown("<h2 style='text-align:center; color:#007acc;'>📊 Candle Patterns Detected</h2>", unsafe_allow_html=True)
+
+# Table for candle patterns
+candle_pattern_styled_html = "<table style='width:100%; border-collapse: collapse;'>"
+candle_pattern_styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" for col in ["Pair", "Candle Pattern"]]) + "</tr>"
+
+# Style and populate the rows
+for _, row in pd.DataFrame(candle_pattern_rows).iterrows():
+    candle_pattern_styled_html += f"<tr>"
+    for col in ["Pair", "Candle Pattern"]:
+        val = row[col]
+        if col == "Pair":
+            val = f"<strong style='font-size: 18px;'>{val}</strong>"
+        candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
+    candle_pattern_styled_html += "</tr>"
+
+candle_pattern_styled_html += "</table>"
+
+# Display candle pattern table below the original table
+st.markdown(candle_pattern_styled_html, unsafe_allow_html=True)
