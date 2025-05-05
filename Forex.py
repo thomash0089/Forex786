@@ -418,5 +418,3 @@ st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
 st.text(f"Strong Signals Found: {len(strongs)}")
-
-
