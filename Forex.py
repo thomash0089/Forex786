@@ -171,8 +171,12 @@ for label, symbol in symbols.items():
         tf = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
-        signal_time = df.index[-1]
-        age_minutes = int((datetime.now() - signal_time).total_seconds() / 60)
+       from pytz import timezone  # Add at the top if not already there
+
+signal_time = df.index[-1].tz_localize('UTC').tz_convert('Asia/Karachi')
+now = datetime.now(timezone('Asia/Karachi'))
+age_minutes = int((now - signal_time).total_seconds() / 60)
+
 
         indicators = []
         if dir:
