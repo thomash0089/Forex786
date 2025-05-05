@@ -191,9 +191,10 @@ for label, symbol in symbols.items():
         volume_spike = detect_volume_spike(df)
 
         # ✅ Corrected signal age logic
-        signal_time = df.index[-1].tz_localize('UTC').tz_convert('Asia/Karachi')
-        now = datetime.now(timezone('Asia/Karachi'))
+        signal_time = pd.to_datetime(df.index[-1])
+        now = datetime.now()
         age_minutes = int((now - signal_time).total_seconds() / 60)
+        age_minutes = max(0, age_minutes)
 
 
         indicators = []
