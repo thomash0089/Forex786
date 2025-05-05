@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | Full Final Version) ---
+# --- Signals with H & I (15-Min Timeframe | Final Clean Version) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -6,19 +6,18 @@ import requests
 import numpy as np
 from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
-from pytz import timezone  # ✅ Signal age timezone fix
+from pytz import timezone
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
-st_autorefresh(interval=120000, key="auto_refresh")  # auto refresh every 2 min
+st_autorefresh(interval=120000, key="auto_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
-
 symbols = {
     "EUR/USD": "EUR/USD", "GBP/USD": "GBP/USD", "USD/JPY": "USD/JPY",
     "AUD/USD": "AUD/USD", "USD/CAD": "USD/CAD", "USD/CHF": "USD/CHF",
     "XAU/USD": "XAU/USD", "WTI/USD": "WTI/USD", "EUR/JPY": "EUR/JPY", "NZD/USD": "NZD/USD"
 }
-
 news_events = {
     "EUR/USD": [{"time": "10:30", "title": "Euro CPI Data"}],
     "GBP/USD": [{"time": "11:00", "title": "BoE Governor Speech"}],
@@ -32,7 +31,6 @@ news_events = {
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
 }
 
-# ---------------- Indicator Calculations ---------------- #
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -105,7 +103,7 @@ def detect_divergence_direction(df):
     if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
         return "Bearish"
     return ""
-    def detect_trend_reversal(df):
+def detect_trend_reversal(df):
     if len(df) < 3:
         return ""
     e9 = df['EMA9'].iloc[-3:]
@@ -192,7 +190,6 @@ for label, symbol in symbols.items():
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
 
-        # ✅ Signal Age in Pakistan Time
         signal_time = df.index[-1].tz_localize('UTC').tz_convert('Asia/Karachi')
         now = datetime.now(timezone('Asia/Karachi'))
         age_minutes = int((now - signal_time).total_seconds() / 60)
@@ -235,8 +232,6 @@ for label, symbol in symbols.items():
             "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
-        import streamlit.components.v1 as components
-
 column_order = [
     "Pair", "Price", "RSI", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Volume Spike", "Signal Age", "AI Suggestion", "Advice", "News Alert"
@@ -257,14 +252,14 @@ def style_row(row):
         pd.notna(ai) and "Confidence: Strong" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #add8e6;'  # Blue for strong match
+        return 'background-color: #add8e6;'  # Blue
     if (
         pd.notna(ai) and "Confidence: Medium" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #ccffcc;'  # Green for medium
+        return 'background-color: #ccffcc;'  # Light Green
     if "Reversal" in row['Reversal Signal']:
-        return 'background-color: #fff0b3;'  # Yellow for reversal signal
+        return 'background-color: #fff0b3;'  # Yellow
     return ''
 
 def trend_color_text(trend):
@@ -287,7 +282,7 @@ for _, row in df_sorted.iterrows():
     styled_html += "</tr>"
 styled_html += "</table>"
 
-# Show table and footer
+# Show table + summary
 st.markdown(styled_html, unsafe_allow_html=True)
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
