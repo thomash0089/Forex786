@@ -100,21 +100,35 @@ def detect_candle_pattern(df):
     range_ = current_high - current_low
     previous_open = o.iloc[-2]
     previous_close = c.iloc[-2]
+    upper_wick = current_high - max(current_open, current_close)
+    lower_wick = min(current_open, current_close) - current_low
 
-    # Determine simple 3-candle trend
+    # ✅ Trend check
     trend_up = c.iloc[0] < c.iloc[1] < c.iloc[2]
     trend_down = c.iloc[0] > c.iloc[1] > c.iloc[2]
 
-    if body < range_ * 0.1:
+    # ✅ Doji: very small body, large wicks
+    if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
         return "Doji"
-    if trend_up and previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
+
+    # ✅ Bullish Engulfing
+    if trend_down and previous_close < previous_open and current_close > current_open and \
+       current_close > previous_open and current_open < previous_close:
         return "Bullish Engulfing"
-    if trend_down and previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
+
+    # ✅ Bearish Engulfing
+    if trend_up and previous_close > previous_open and current_close < current_open and \
+       current_close < previous_open and current_open > previous_close:
         return "Bearish Engulfing"
-    if trend_down and body < range_ * 0.3 and (current_low < current_open and current_low < current_close) and (current_high - max(current_open, current_close)) < body:
+
+    # ✅ Hammer (usually bottom reversal)
+    if trend_down and body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
         return "Hammer"
-    if trend_up and body < range_ * 0.3 and (current_high > current_open and current_high > current_close) and (min(current_open, current_close) - current_low) < body:
+
+    # ✅ Shooting Star (usually top reversal)
+    if trend_up and body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
         return "Shooting Star"
+
     return ""
 
 
