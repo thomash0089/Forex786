@@ -17,7 +17,6 @@ symbols = {
     "XAU/USD": "XAU/USD", "WTI/USD": "WTI/USD", "EUR/JPY": "EUR/JPY", "NZD/USD": "NZD/USD"
 }
 
-
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -31,7 +30,6 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     df = df.astype(float).sort_index()
     return df
 
-
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = delta.where(delta > 0, 0)
@@ -41,7 +39,6 @@ def calculate_rsi(series, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
-
 def calculate_macd(series):
     ema12 = series.ewm(span=12, adjust=False).mean()
     ema26 = series.ewm(span=26, adjust=False).mean()
@@ -49,10 +46,8 @@ def calculate_macd(series):
     signal = macd.ewm(span=9, adjust=False).mean()
     return macd, signal
 
-
 def calculate_ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
-
 
 def calculate_adx(df, period=14):
     df['TR'] = np.maximum(df['high'] - df['low'],
@@ -69,7 +64,6 @@ def calculate_adx(df, period=14):
     dx = 100 * abs(plus_di14 - minus_di14) / (plus_di14 + minus_di14)
     adx = dx.rolling(window=period).mean()
     return adx
-
 
 def detect_candle_pattern(df):
     o1, h1, l1, c1 = df['open'].iloc[-2], df['high'].iloc[-2], df['low'].iloc[-2], df['close'].iloc[-2]
@@ -97,7 +91,6 @@ def detect_candle_pattern(df):
 
     return ""
 
-
 def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
     df = df.dropna()
@@ -115,7 +108,6 @@ def detect_divergence_direction(df):
             return "Bearish"
     return ""
 
-
 def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
         df = fetch_data(symbol, interval=tf)
@@ -124,7 +116,6 @@ def get_tf_confirmation(symbol):
             if dir:
                 return f"Confirm {dir}"
     return ""
-
 
 def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     if not direction:
@@ -142,7 +133,6 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
 
-
 def detect_trend_reversal(df):
     if len(df) < 3:
         return ""
@@ -158,7 +148,6 @@ def detect_trend_reversal(df):
         return "Reversal Forming Bearish"
     return ""
 
-
 rows = []
 for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
@@ -168,11 +157,12 @@ for label, symbol in symbols.items():
         df['EMA9'] = calculate_ema(df['close'], 9)
         df['EMA20'] = calculate_ema(df['close'], 20)
         df['ADX'] = calculate_adx(df)
-    if 'volume' in df.columns:
-    df['Volume_EMA20'] = df['volume'].ewm(span=20).mean()
-else:
-    df['Volume_EMA20'] = np.nan
-    df['Volume_EMA20'] = np.nan  # or use 0 if preferred
+
+        if 'volume' in df.columns:
+            df['Volume_EMA20'] = df['volume'].ewm(span=20).mean()
+        else:
+            df['Volume_EMA20'] = np.nan
+
         df = df.dropna()
 
         price_now = df['close'].iloc[-1]
@@ -193,7 +183,7 @@ else:
                 indicators.append("EMA")
             if df['ADX'].iloc[-1] > 20:
                 indicators.append("ADX")
-            if df['volume'].iloc[-1] > df['Volume_EMA20'].iloc[-1]:
+            if 'volume' in df.columns and df['volume'].iloc[-1] > df['Volume_EMA20'].iloc[-1]:
                 indicators.append("Volume Spike")
             pattern = detect_candle_pattern(df)
             if direction in pattern:
