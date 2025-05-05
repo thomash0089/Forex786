@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | Final Fixed Version with ATR) ---
+# --- Signals with H & I (15-Min Timeframe | ATR Status Added) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -7,7 +7,6 @@ import numpy as np
 from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
 from pytz import timezone
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
 st_autorefresh(interval=120000, key="auto_refresh")
@@ -195,6 +194,9 @@ for label, symbol in symbols.items():
         df = df.dropna()
 
         price_now = df['close'].iloc[-1]
+        atr_value = df['ATR'].iloc[-1]
+        atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
+
         direction = detect_divergence_direction(df)
         tf_status = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
@@ -234,27 +236,24 @@ for label, symbol in symbols.items():
         advice = generate_advice(trend, direction, ai_suggestion, tf_status)
 
         rows.append({
-            "Pair": label,
-            "Price": round(price_now, 5),
-            "RSI": round(df['RSI'].iloc[-1], 2),
-            "ATR": round(df['ATR'].iloc[-1], 5),
-            "Trend": trend,
-            "Divergence": direction,
-            "TF": tf_status,
+            "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
+            "ATR": round(atr_value, 5), "ATR Status": atr_status,
+            "Trend": trend, "Divergence": direction, "TF": tf_status,
             "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators),
             "Volume Spike": "Yes" if volume_spike else "No",
             "Signal Age": f"{age_minutes} min ago",
-            "AI Suggestion": ai_suggestion,
-            "Advice": advice,
+            "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
 
+# ---------------- Table Layout ---------------- #
 column_order = [
-    "Pair", "Price", "RSI", "ATR", "Trend", "Divergence", "TF", "Reversal Signal",
+    "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Volume Spike", "Signal Age", "AI Suggestion", "Advice", "News Alert"
 ]
 
+# Display HTML table with color formatting
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
 styled_html += "<tr>" + "".join([
     f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
@@ -284,8 +283,7 @@ def trend_color_text(trend):
     color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "gray"
     return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
 
-df_sorted = pd.DataFrame(rows)
-df_sorted = df_sorted.sort_values(by="Pair", na_position='last')
+df_sorted = pd.DataFrame(rows).sort_values(by="Pair", na_position='last')
 
 for _, row in df_sorted.iterrows():
     style = style_row(row)
@@ -298,9 +296,11 @@ for _, row in df_sorted.iterrows():
             val = trend_color_text(val)
         styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
     styled_html += "</tr>"
-styled_html += "</table>"
 
+styled_html += "</table>"
 st.markdown(styled_html, unsafe_allow_html=True)
+
+# Summary
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
