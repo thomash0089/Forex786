@@ -323,7 +323,7 @@ for label, symbol in symbols.items():
             if direction in pattern:
                 indicators.append("Candle")
 
-            if len(indicators) < 5:
+            if len(indicators) < 3:
                 direction = ""
                 ai_suggestion = ""
             else:
