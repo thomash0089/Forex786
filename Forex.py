@@ -220,27 +220,29 @@ for label, symbol in symbols.items():
             direction = ""
 
         tf_status = get_tf_confirmation(symbol)
+# Always define lows and highs first
+lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
+highs = argrelextrema(df['close'].values, np.greater_equal, order=3)[0]
 
-        candle_age = ""
-    if direction == "Bullish":
-        lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
+candle_age = ""
+if direction == "Bullish":
     if len(lows) >= 2:
         candle_age = len(df) - lows[-1]
-    elif direction == "Bearish":
-        highs = argrelextrema(df['close'].values, np.greater_equal, order=3)[0]
+elif direction == "Bearish":
     if len(highs) >= 2:
         candle_age = len(df) - highs[-1]
-    else:
-        candle_age = ""
+else:
+    candle_age = ""
 
-    # 🧪 Debug print to check what's going on
-    st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if candle_age and int(candle_age) > 2 else 'OK'}")
+# Debug print
+st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if candle_age and int(candle_age) > 2 else 'OK'}")
 
-    # 🚫 Skip old signals
-    if candle_age != "" and int(candle_age) > 2:
-        direction = ""
-        ai_suggestion = ""
+# Skip old signals
+if candle_age != "" and int(candle_age) > 2:
+    direction = ""
+    ai_suggestion = ""
 
+        
 
         pattern = detect_candle_pattern(df)
         candle_pattern = pattern if pattern else "—"
