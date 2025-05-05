@@ -164,7 +164,12 @@ def get_tf_confirmation(symbol):
             if dir:
                 return f"Confirm {dir}"
     return ""
-    def get_tf_confirmation(symbol):
+   def generate_ai_suggestion(...):
+    ...
+    return suggestion_string
+
+# ⬇ This must be outside of any function
+def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
         df = fetch_data(symbol, interval=tf)
         if df is not None:
