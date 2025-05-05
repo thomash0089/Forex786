@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | With Volume + Candle Pattern) ---
+# --- Signals with H & I (15-Min | Show All Pairs | Highlight on Signal) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -8,7 +8,7 @@ from datetime import datetime
 from scipy.signal import argrelextrema
 
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
-st_autorefresh(interval=120000, key="auto_refresh")  # 2 min
+st_autorefresh(interval=120000, key="auto_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
 symbols = {
@@ -68,10 +68,8 @@ def calculate_adx(df, period=14):
 def detect_candle_pattern(df):
     o1, h1, l1, c1 = df['open'].iloc[-2], df['high'].iloc[-2], df['low'].iloc[-2], df['close'].iloc[-2]
     o2, h2, l2, c2 = df['open'].iloc[-1], df['high'].iloc[-1], df['low'].iloc[-1], df['close'].iloc[-1]
-
     body = abs(c2 - o2)
     candle_range = h2 - l2
-
     if c2 > o2 and o2 < c1 and c2 > o1 and c1 < o1:
         return "Bullish Engulfing"
     if o2 > c2 and o2 > c1 and c2 < o1 and c1 > o1:
@@ -122,7 +120,7 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
         confidence = "Low"
     else:
         return ""
-    return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
+    return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f}"
 
 def detect_trend_reversal(df):
     if len(df) < 3:
@@ -141,7 +139,7 @@ def detect_trend_reversal(df):
 
 rows = []
 for label, symbol in symbols.items():
-    df = fetch_data(symbol, interval="15min")
+    df = fetch_data(symbol)
     if df is not None:
         df['RSI'] = calculate_rsi(df['close'])
         df['MACD'], df['MACD_Signal'] = calculate_macd(df['close'])
@@ -182,29 +180,44 @@ for label, symbol in symbols.items():
             if direction in pattern:
                 indicators.append("Candle")
 
+        ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
+        advice = ai_suggestion if ai_suggestion else ""
+
         trend = (
             "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
             else "Bearish" if df['EMA9'].iloc[-1] < df['EMA20'].iloc[-1] and price_now < df['EMA9'].iloc[-1]
             else "Sideways"
         )
 
-        tf_match = (direction == "Bullish" and "Confirm Bullish" in tf_status) or (
-                   direction == "Bearish" and "Confirm Bearish" in tf_status)
-        ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_match)
-        advice = ai_suggestion if ai_suggestion else "No suggestion"
-
         rows.append({
-            "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
-            "Trend": trend, "Divergence": direction, "TF": tf_status,
+            "Pair": label,
+            "Price": round(price_now, 5),
+            "RSI": round(df['RSI'].iloc[-1], 2),
+            "Trend": trend,
+            "Divergence": direction,
+            "TF": tf_status,
             "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators),
-            "AI Suggestion": ai_suggestion, "Advice": advice
+            "AI Suggestion": ai_suggestion,
+            "Advice": advice,
+            "Highlight": direction if len(indicators) >= 3 else ""
         })
 
-# --- Final Display Block with Error Handling ---
-if rows:
-    df_sorted = pd.DataFrame(rows).sort_values(by="Pair")
-    st.dataframe(df_sorted, use_container_width=True)
-    st.caption(f"Updated with Volume + Candle Pattern | Time: {datetime.now().strftime('%H:%M:%S')}")
+# --- Display Table with Highlight ---
+df_display = pd.DataFrame(rows).sort_values(by="Pair")
+
+def highlight_row(row):
+    if row["Highlight"] == "Bullish":
+        return ['background-color: #d4fcd4'] * len(row)
+    elif row["Highlight"] == "Bearish":
+        return ['background-color: #fcd4d4'] * len(row)
+    else:
+        return [''] * len(row)
+
+if not df_display.empty:
+    styled_table = df_display.drop(columns=["Highlight"]).style.apply(highlight_row, axis=1)
+    st.dataframe(styled_table, use_container_width=True)
 else:
-    st.warning("No data available to display at the moment.")
+    st.warning("No data to show.")
+
+st.caption(f"Updated | Time: {datetime.now().strftime('%H:%M:%S')}")
