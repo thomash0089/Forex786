@@ -280,9 +280,8 @@ for label, symbol in symbols.items():
         direction = detect_divergence_direction(df)
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
-         st.text(f"{label} | Dir: {direction} | RSI: {df['RSI'].iloc[-1]:.2f} | Vol Spike: {volume_spike}")
-
-
+        st.text(f"{label} | Dir: {direction} | RSI: {df['RSI'].iloc[-1]:.2f} | Vol Spike: {volume_spike}")
+     
         #if direction == "Bullish":
             #if df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal:
                 #direction = ""
