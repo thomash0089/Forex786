@@ -278,13 +278,7 @@ for label, symbol in symbols.items():
         else:
             ai_suggestion = ""
 
-        trend = (
-            "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
-            else "Bearish" if df['EMA9'].iloc[-1] < df['EMA20'].iloc[-1] and price_now < df['EMA9'].iloc[-1]
-            else "Sideways"
-        )
-
-       advice = generate_advice(trend, direction, ai_suggestion, tf_status)
+        advice = generate_advice(trend, direction, ai_suggestion, tf_status)
 
         rows.append({
             "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
