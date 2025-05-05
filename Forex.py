@@ -249,7 +249,7 @@ st.markdown(styled_html, unsafe_allow_html=True)
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
-st.text(f"Strong Signals Found: {len(strongs)}") --- Signals with H & I (15-Min Timeframe | Enhanced Version with Confirmation Filters) ---
+st.text(f"Strong Signals Found: {len(strongs)}")  # Signals with H & I (15-Min Timeframe | Enhanced Version with Confirmation Filters)
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
