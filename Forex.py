@@ -251,7 +251,7 @@ for label, symbol in symbols.items():
         pattern = detect_candle_pattern(df)
         candle_pattern = pattern if pattern else "—"
 
-        indicators = []
+         indicators = []
         if direction:
             indicators.append("RSI")
             if direction == "Bullish" and df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
@@ -269,14 +269,23 @@ for label, symbol in symbols.items():
             if direction in pattern:
                 indicators.append("Candle")
 
+            # ❌ Reject weak signals with less than 5 confirmations
+            if len(indicators) < 5:
+                direction = ""
+                ai_suggestion = ""
+            else:
+                ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
+        else:
+            ai_suggestion = ""
+
+
         trend = (
             "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
             else "Bearish" if df['EMA9'].iloc[-1] < df['EMA20'].iloc[-1] and price_now < df['EMA9'].iloc[-1]
             else "Sideways"
         )
 
-        ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
-        advice = generate_advice(trend, direction, ai_suggestion, tf_status)
+       advice = generate_advice(trend, direction, ai_suggestion, tf_status)
 
         rows.append({
             "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
