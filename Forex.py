@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | ATR Status Added) ---
+# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -91,12 +91,29 @@ def detect_volume_spike(df):
     return last_vol > 1.5 * avg_vol
 
 def detect_candle_pattern(df):
-    o, c, h, l = df['open'].iloc[-1], df['close'].iloc[-1], df['high'].iloc[-1], df['low'].iloc[-1]
-    if abs(c - o) < (h - l) * 0.3:
-        if c > o:
-            return "Bullish"
-        elif o > c:
-            return "Bearish"
+    o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
+
+    current_open = o.iloc[-1]
+    current_close = c.iloc[-1]
+    current_high = h.iloc[-1]
+    current_low = l.iloc[-1]
+
+    body = abs(current_close - current_open)
+    range_ = current_high - current_low
+
+    previous_open = o.iloc[-2]
+    previous_close = c.iloc[-2]
+
+    if body < range_ * 0.1:
+        return "Doji"
+    if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
+        return "Bullish Engulfing"
+    if previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
+        return "Bearish Engulfing"
+    if body < range_ * 0.3 and (current_low < current_open and current_low < current_close) and (current_high - max(current_open, current_close)) < body:
+        return "Hammer"
+    if body < range_ * 0.3 and (current_high > current_open and current_high > current_close) and (min(current_open, current_close) - current_low) < body:
+        return "Shooting Star"
     return ""
 
 def detect_divergence_direction(df):
@@ -207,6 +224,9 @@ for label, symbol in symbols.items():
         age_minutes = int((now - signal_time).total_seconds() / 60)
         age_minutes = max(0, age_minutes)
 
+        pattern = detect_candle_pattern(df)
+        candle_pattern = pattern if pattern else "—"
+
         indicators = []
         if direction:
             indicators.append("RSI")
@@ -222,7 +242,6 @@ for label, symbol in symbols.items():
                 indicators.append("ADX")
             if volume_spike:
                 indicators.append("Volume")
-            pattern = detect_candle_pattern(df)
             if direction in pattern:
                 indicators.append("Candle")
 
@@ -241,6 +260,7 @@ for label, symbol in symbols.items():
             "Trend": trend, "Divergence": direction, "TF": tf_status,
             "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators),
+            "Candle Pattern": candle_pattern,
             "Volume Spike": "Yes" if volume_spike else "No",
             "Signal Age": f"{age_minutes} min ago",
             "AI Suggestion": ai_suggestion, "Advice": advice,
@@ -250,10 +270,10 @@ for label, symbol in symbols.items():
 # ---------------- Table Layout ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
-    "Confirmed Indicators", "Volume Spike", "Signal Age", "AI Suggestion", "Advice", "News Alert"
+    "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
+    "AI Suggestion", "Advice", "News Alert"
 ]
 
-# Display HTML table with color formatting
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
 styled_html += "<tr>" + "".join([
     f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
@@ -300,7 +320,6 @@ for _, row in df_sorted.iterrows():
 styled_html += "</table>"
 st.markdown(styled_html, unsafe_allow_html=True)
 
-# Summary
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
