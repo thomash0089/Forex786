@@ -418,6 +418,8 @@ st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
 st.text(f"Strong Signals Found: {len(strongs)}")
+
+
 # ---------------- Candle Pattern Section ---------------- #
 def detect_candle_pattern(df):
     o, c, h, l = df['open'].iloc[-4:], df['close'].iloc[-4:], df['high'].iloc[-4:], df['low'].iloc[-4:]
