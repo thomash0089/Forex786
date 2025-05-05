@@ -1,4 +1,4 @@
- --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Safe Filters) ---
+# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Safe Filters) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
