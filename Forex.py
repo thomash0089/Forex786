@@ -464,77 +464,38 @@ def detect_candle_pattern(df):
 
     # Doji: Small body, large wicks
     if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
-        return "Doji"
+        return "Doji", "images/doji.png"
     
     # Bullish Engulfing: Large bull candle fully engulfs previous bear candle
     if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
-        return "Bullish Engulfing"
+        return "Bullish Engulfing", "images/bullish_engulfing.png"
     
     # Bearish Engulfing: Large bear candle fully engulfs previous bull candle
     if previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
-        return "Bearish Engulfing"
+        return "Bearish Engulfing", "images/bearish_engulfing.png"
     
     # Hammer: Small body at the top with long lower wick
     if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
-        return "Hammer"
+        return "Hammer", "images/hammer.png"
     
     # Hanging Man: Same as Hammer, but occurs in an uptrend
     if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
-        return "Hanging Man"
+        return "Hanging Man", "images/hanging_man.png"
     
     # Shooting Star: Small body at the bottom with long upper wick
     if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
-        return "Shooting Star"
+        return "Shooting Star", "images/shooting_star.png"
     
     # Morning Star: A three-candle pattern with a large bear, small indecisive candle, and large bull candle
     if previous_close > previous_open and current_open > current_close and current_close > previous_open:
-        return "Morning Star"
+        return "Morning Star", "images/morning_star.png"
     
     # Evening Star: A three-candle pattern with a large bull, small indecisive candle, and large bear candle
     if previous_close < previous_open and current_open < current_close and current_close < previous_open:
-        return "Evening Star"
+        return "Evening Star", "images/evening_star.png"
     
-    # Bullish Harami: Small bull candle within a large bear candle
-    if previous_close > previous_open and current_close < current_open and current_open > previous_close:
-        return "Bullish Harami"
-    
-    # Bearish Harami: Small bear candle within a large bull candle
-    if previous_close < previous_open and current_close > current_open and current_open < previous_close:
-        return "Bearish Harami"
-    
-    # Bullish Abandoned Baby: A bullish gap-up with a Doji
-    if previous_close < previous_open and current_open > previous_close and abs(current_open - current_close) < body:
-        return "Bullish Abandoned Baby"
-    
-    # Bearish Abandoned Baby: A bearish gap-down with a Doji
-    if previous_close > previous_open and current_open < previous_close and abs(current_open - current_close) < body:
-        return "Bearish Abandoned Baby"
-    
-    # Piercing Line: Bullish pattern where a large bear candle is followed by a large bull candle
-    if previous_close < previous_open and current_open < previous_close and current_close > (previous_open + previous_close) / 2:
-        return "Piercing Line"
-    
-    # Dark Cloud Cover: Bearish pattern where a large bull candle is followed by a large bear candle
-    if previous_close > previous_open and current_open > previous_close and current_close < (previous_open + previous_close) / 2:
-        return "Dark Cloud Cover"
-    
-    # Three White Soldiers: Three consecutive bullish candles with higher closes
-    if current_close > current_open and previous_close < previous_open and previous_open < current_close:
-        return "Three White Soldiers"
-    
-    # Three Black Crows: Three consecutive bearish candles with lower closes
-    if current_close < current_open and previous_close > previous_open and previous_open > current_close:
-        return "Three Black Crows"
-    
-    # Spinning Top: Small body with long wicks (indicating indecision)
-    if body < range_ * 0.3 and upper_wick > body and lower_wick > body:
-        return "Spinning Top"
-    
-    # Marubozu: No wicks (either bullish or bearish)
-    if upper_wick == 0 and lower_wick == 0:
-        return "Marubozu"
-
-    return ""
+    # Other patterns...
+    return "—", ""
 
 # ---------------- Candle Pattern Section ---------------- #
 # Detect candle patterns and display separately
@@ -545,12 +506,12 @@ for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
     if df is not None:
         # Detect the current candle pattern for each pair
-        pattern = detect_candle_pattern(df)
-        candle_pattern = pattern if pattern else "—"  # Default to "—" if no pattern detected
+        pattern_name, pattern_image = detect_candle_pattern(df)
         
         candle_pattern_rows.append({
             "Pair": label, 
-            "Candle Pattern": candle_pattern
+            "Candle Pattern": pattern_name,
+            "Image": pattern_image
         })
 
 # ---------------- Display Candle Pattern Table ---------------- #
@@ -558,7 +519,7 @@ st.markdown("<h2 style='text-align:center; color:#007acc;'>📊 Candle Patterns 
 
 # Create the HTML table for the candle patterns
 candle_pattern_styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-candle_pattern_styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" for col in ["Pair", "Candle Pattern"]]) + "</tr>"
+candle_pattern_styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" for col in ["Pair", "Candle Pattern", "Pattern Image"]]) + "</tr>"
 
 for _, row in pd.DataFrame(candle_pattern_rows).iterrows():
     candle_pattern_styled_html += f"<tr>"
@@ -567,6 +528,10 @@ for _, row in pd.DataFrame(candle_pattern_rows).iterrows():
         if col == "Pair":
             val = f"<strong style='font-size: 18px;'>{val}</strong>"
         candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
+    
+    # Add the image for the detected pattern
+    candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'><img src='{row['Image']}' alt='{row['Candle Pattern']}' width='50'></td>"
+    
     candle_pattern_styled_html += "</tr>"
 
 candle_pattern_styled_html += "</table>"
