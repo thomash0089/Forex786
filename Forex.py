@@ -37,12 +37,17 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     data = r.json()
     if "values" not in data:
         return None
-    df = pd.DataFrame(data["values"])
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    df.set_index("datetime", inplace=True)
-    df = df.astype(float).sort_index()
-    return df
-
+    try:
+        df = pd.DataFrame(data["values"])
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df.set_index("datetime", inplace=True)
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            if col in df.columns:
+                df[col] = df[col].astype(float)
+        return df.sort_index()
+    except Exception as e:
+        print("Data parsing error:", e)
+        return None
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = delta.where(delta > 0, 0)
