@@ -30,7 +30,6 @@ news_events = {
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
 }
 
-# --- Indicator Functions ---
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -60,7 +59,6 @@ def calculate_atr(df, period=14):
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     atr = tr.rolling(window=period).mean()
     return atr
-
 def calculate_macd(series):
     ema12 = series.ewm(span=12, adjust=False).mean()
     ema26 = series.ewm(span=26, adjust=False).mean()
@@ -93,18 +91,14 @@ def detect_volume_spike(df):
 
 def detect_candle_pattern(df):
     o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
-
     current_open = o.iloc[-1]
     current_close = c.iloc[-1]
     current_high = h.iloc[-1]
     current_low = l.iloc[-1]
-
     body = abs(current_close - current_open)
     range_ = current_high - current_low
-
     previous_open = o.iloc[-2]
     previous_close = c.iloc[-2]
-
     if body < range_ * 0.1:
         return "Doji"
     if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
@@ -128,7 +122,8 @@ def detect_divergence_direction(df):
     if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
         return "Bearish"
     return ""
-    def detect_trend_reversal(df):
+
+def detect_trend_reversal(df):
     if len(df) < 3:
         return ""
     e9 = df['EMA9'].iloc[-3:]
@@ -142,6 +137,7 @@ def detect_divergence_direction(df):
     elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
         return "Reversal Forming Bearish"
     return ""
+
 def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     if not direction:
         return ""
@@ -157,7 +153,6 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     else:
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
-
 def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
         df = fetch_data(symbol, interval=tf)
