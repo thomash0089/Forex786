@@ -303,8 +303,11 @@ def trend_color_text(trend):
     color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "gray"
     return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
 
-df_sorted = pd.DataFrame(rows).sort_values(by="Pair", na_position='last')
-
+df_result = pd.DataFrame(rows)
+if "Pair" in df_result.columns:
+    df_sorted = df_result.sort_values(by="Pair", na_position='last')
+else:
+    df_sorted = df_result
 for _, row in df_sorted.iterrows():
     style = style_row(row)
     styled_html += f"<tr style='{style}'>"
