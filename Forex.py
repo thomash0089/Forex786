@@ -1,6 +1,3 @@
-test_df = fetch_data("EUR/USD", interval="15min")
-st.write("EUR/USD Sample Data:", test_df.tail() if test_df is not None else "❌ No data returned")
-
 # --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
