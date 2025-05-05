@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Safe Filters) ---
+ --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Safe Filters) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -155,6 +155,15 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     else:
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
+
+def get_tf_confirmation(symbol):
+    for tf in ["5min", "15min", "1h"]:
+        df = fetch_data(symbol, interval=tf)
+        if df is not None:
+            dir = detect_divergence_direction(df)
+            if dir:
+                return f"Confirm {dir}"
+    return ""
     def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
         df = fetch_data(symbol, interval=tf)
@@ -163,6 +172,7 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
             if dir:
                 return f"Confirm {dir}"
     return ""
+
 def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
     if not divergence:
         return "No signal detected — wait"
