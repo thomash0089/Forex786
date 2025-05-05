@@ -164,6 +164,8 @@ for label, symbol in symbols.items():
             df['Volume_EMA20'] = np.nan
 
         df = df.dropna()
+        if df.empty:
+            continue
 
         price_now = df['close'].iloc[-1]
         direction = detect_divergence_direction(df)
