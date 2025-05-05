@@ -52,13 +52,6 @@ def calculate_rsi(series, period=14):
     avg_loss = loss.rolling(window=period).mean()
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
-
-def calculate_macd(series):
-    ema12 = series.ewm(span=12, adjust=False).mean()
-    ema26 = series.ewm(span=26, adjust=False).mean()
-    macd = ema12 - ema26
-    signal = macd.ewm(span=9, adjust=False).mean()
-    return macd, signal
 def calculate_atr(df, period=14):
     tr1 = df['high'] - df['low']
     tr2 = abs(df['high'] - df['close'].shift())
@@ -66,6 +59,27 @@ def calculate_atr(df, period=14):
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     atr = tr.rolling(window=period).mean()
     return atr
+    for label, symbol in symbols.items():
+    df['ADX'] = calculate_adx(df)
+    df['ADX'] = calculate_adx(df)
+    df['ATR'] = calculate_atr(df)
+    rows.append({
+    "Pair": label,
+    "Price": round(price_now, 5),
+    ...
+       "ATR": round(df['ATR'].iloc[-1], 5),
+    column_order = [
+    "Pair", "Price", "RSI", "ATR", "Trend", "Divergence", "TF", "Reversal Signal",
+    "Confirmed Indicators", "Volume Spike", "Signal Age", "AI Suggestion", "Advice", "News Alert"
+]
+
+def calculate_macd(series):
+    ema12 = series.ewm(span=12, adjust=False).mean()
+    ema26 = series.ewm(span=26, adjust=False).mean()
+    macd = ema12 - ema26
+    signal = macd.ewm(span=9, adjust=False).mean()
+    return macd, signal
+
 def calculate_ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
 
