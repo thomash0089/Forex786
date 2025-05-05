@@ -168,7 +168,10 @@ for label, symbol in symbols.items():
         df['EMA9'] = calculate_ema(df['close'], 9)
         df['EMA20'] = calculate_ema(df['close'], 20)
         df['ADX'] = calculate_adx(df)
-        df['Volume_EMA20'] = df['volume'].ewm(span=20).mean()
+        if 'volume' in df.columns:
+    df['Volume_EMA20'] = df['volume'].ewm(span=20).mean()
+else:
+    df['Volume_EMA20'] = np.nan  # or use 0 if preferred
         df = df.dropna()
 
         price_now = df['close'].iloc[-1]
