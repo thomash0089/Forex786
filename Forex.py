@@ -369,7 +369,7 @@ def style_row(row):
     tf = row['TF']
     trend = row['Trend']
     div = row['Divergence']
-    age = row['Signal Age']
+    age = row['Candle Age']
     try:
         age_minutes = int(age.split()[0])
     except:
