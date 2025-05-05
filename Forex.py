@@ -213,18 +213,15 @@ for label, symbol in symbols.items():
         price_now = df['close'].iloc[-1]
         atr_value = df['ATR'].iloc[-1]
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
-
+        
         direction = detect_divergence_direction(df)
-if direction:
-    recent = df['RSI'].iloc[-2:]
-    if direction == "Bullish" and all(r < 50 for r in recent):
-        direction = ""
-    if direction == "Bearish" and all(r > 50 for r in recent):
-        direction = ""
-    if direction == "Bullish" and all(r < 50 for r in recent):
-        direction = ""
-    if direction == "Bearish" and all(r > 50 for r in recent):
-        direction = ""
+        recent = df['RSI'].iloc[-2:]
+
+        if direction == "Bullish" and all(r < 50 for r in recent):
+            direction = ""
+        if direction == "Bearish" and all(r > 50 for r in recent):
+            direction = ""
+
         tf_status = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
@@ -276,8 +273,7 @@ if direction:
             "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
-
-# ---------------- Table Layout ---------------- #
+     # ---------------- Table Layout ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
