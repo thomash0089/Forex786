@@ -355,7 +355,7 @@ for label, symbol in symbols.items():
 # ---------------- Table Display ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
-    "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
+    "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Candle Age",
     "AI Suggestion", "Advice", "News Alert"
 ]
 
