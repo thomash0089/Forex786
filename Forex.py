@@ -298,16 +298,24 @@ def style_row(row):
     tf = row['TF']
     trend = row['Trend']
     div = row['Divergence']
-    if (
-        pd.notna(ai) and "Confidence: Strong" in ai and trend == div
-        and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
-    ):
-        return 'background-color: #add8e6;'  # Light Blue
-    if (
-        pd.notna(ai) and "Confidence: Medium" in ai and trend == div
-        and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
-    ):
-        return 'background-color: #ccffcc;'  # Light Green
+    age = row['Signal Age']
+    try:
+        age_minutes = int(age.split()[0])
+    except:
+        age_minutes = 99
+
+    # ✅ Only highlight signals younger than 2 candles (~<30 minutes)
+    if age_minutes <= 30:
+        if (
+            pd.notna(ai) and "Confidence: Strong" in ai and trend == div
+            and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
+        ):
+            return 'background-color: #add8e6;'  # Light Blue
+        if (
+            pd.notna(ai) and "Confidence: Medium" in ai and trend == div
+            and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
+        ):
+            return 'background-color: #ccffcc;'  # Light Green
     if "Reversal" in row['Reversal Signal']:
         return 'background-color: #fff0b3;'  # Yellow
     return ''
