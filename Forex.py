@@ -450,52 +450,33 @@ def fetch_data(symbol, interval="15min", outputsize=200):
 
 # --- Candlestick Pattern Detection ---
 def detect_candle_pattern(df):
-    o, c, h, l = df['open'].iloc[-4:], df['close'].iloc[-4:], df['high'].iloc[-4:], df['low'].iloc[-4:]
-    current_open = o.iloc[-1]
-    current_close = c.iloc[-1]
-    current_high = h.iloc[-1]
-    current_low = l.iloc[-1]
-    body = abs(current_close - current_open)
-    range_ = current_high - current_low
-    previous_open = o.iloc[-2]
-    previous_close = c.iloc[-2]
-    upper_wick = current_high - max(current_open, current_close)
-    lower_wick = min(current_open, current_close) - current_low
+    try:
+        o, c, h, l = df['open'].iloc[-4:], df['close'].iloc[-4:], df['high'].iloc[-4:], df['low'].iloc[-4:]
+        current_open = o.iloc[-1]
+        current_close = c.iloc[-1]
+        current_high = h.iloc[-1]
+        current_low = l.iloc[-1]
+        body = abs(current_close - current_open)
+        range_ = current_high - current_low
+        previous_open = o.iloc[-2]
+        previous_close = c.iloc[-2]
+        upper_wick = current_high - max(current_open, current_close)
+        lower_wick = min(current_open, current_close) - current_low
 
-    # Doji: Small body, large wicks
-    if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
-        return "Doji", "images/doji.png"
-    
-    # Bullish Engulfing: Large bull candle fully engulfs previous bear candle
-    if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
-        return "Bullish Engulfing", "images/bullish_engulfing.png"
-    
-    # Bearish Engulfing: Large bear candle fully engulfs previous bull candle
-    if previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
-        return "Bearish Engulfing", "images/bearish_engulfing.png"
-    
-    # Hammer: Small body at the top with long lower wick
-    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
-        return "Hammer", "images/hammer.png"
-    
-    # Hanging Man: Same as Hammer, but occurs in an uptrend
-    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
-        return "Hanging Man", "images/hanging_man.png"
-    
-    # Shooting Star: Small body at the bottom with long upper wick
-    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
-        return "Shooting Star", "images/shooting_star.png"
-    
-    # Morning Star: A three-candle pattern with a large bear, small indecisive candle, and large bull candle
-    if previous_close > previous_open and current_open > current_close and current_close > previous_open:
-        return "Morning Star", "images/morning_star.png"
-    
-    # Evening Star: A three-candle pattern with a large bull, small indecisive candle, and large bear candle
-    if previous_close < previous_open and current_open < current_close and current_close < previous_open:
-        return "Evening Star", "images/evening_star.png"
-    
-    # Other patterns...
-    return "—", ""
+        # Doji: Small body, large wicks
+        if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
+            return "Doji", "images/doji.png"
+        
+        # Bullish Engulfing: Large bull candle fully engulfs previous bear candle
+        if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
+            return "Bullish Engulfing", "images/bullish_engulfing.png"
+        
+        # Other patterns...
+
+        return "—", ""  # No pattern found
+    except Exception as e:
+        st.write(f"Error detecting pattern: {e}")
+        return "Error", ""
 
 # ---------------- Candle Pattern Section ---------------- #
 # Detect candle patterns and display separately
@@ -522,6 +503,7 @@ candle_pattern_styled_html = "<table style='width:100%; border-collapse: collaps
 candle_pattern_styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" for col in ["Pair", "Candle Pattern", "Pattern Image"]]) + "</tr>"
 
 for _, row in pd.DataFrame(candle_pattern_rows).iterrows():
+    st.write(f"Pair: {row['Pair']}, Pattern: {row['Candle Pattern']}, Image: {row['Image']}")  # Debugging
     candle_pattern_styled_html += f"<tr>"
     for col in ["Pair", "Candle Pattern"]:
         val = row[col]
@@ -530,7 +512,8 @@ for _, row in pd.DataFrame(candle_pattern_rows).iterrows():
         candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
     
     # Add the image for the detected pattern
-    candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'><img src='{row['Image']}' alt='{row['Candle Pattern']}' width='50'></td>"
+    candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px; text-align:center;'>" \
+                             f"<img src='{row['Image']}' alt='{row['Candle Pattern']}' width='50'></td>"
     
     candle_pattern_styled_html += "</tr>"
 
@@ -538,5 +521,6 @@ candle_pattern_styled_html += "</table>"
 
 # Display the table below the main table
 st.markdown(candle_pattern_styled_html, unsafe_allow_html=True)
+
 
 
