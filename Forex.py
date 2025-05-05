@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | Final Fixed Version) ---
+# --- Signals with H & I (15-Min Timeframe | Final Fixed Version with ATR) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -52,6 +52,7 @@ def calculate_rsi(series, period=14):
     avg_loss = loss.rolling(window=period).mean()
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
+
 def calculate_atr(df, period=14):
     tr1 = df['high'] - df['low']
     tr2 = abs(df['high'] - df['close'].shift())
@@ -59,19 +60,6 @@ def calculate_atr(df, period=14):
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     atr = tr.rolling(window=period).mean()
     return atr
-    for label, symbol in symbols.items():
-    df['ADX'] = calculate_adx(df)
-    df['ADX'] = calculate_adx(df)
-    df['ATR'] = calculate_atr(df)
-    rows.append({
-    "Pair": label,
-    "Price": round(price_now, 5),
-    ...
-       "ATR": round(df['ATR'].iloc[-1], 5),
-    column_order = [
-    "Pair", "Price", "RSI", "ATR", "Trend", "Divergence", "TF", "Reversal Signal",
-    "Confirmed Indicators", "Volume Spike", "Signal Age", "AI Suggestion", "Advice", "News Alert"
-]
 
 def calculate_macd(series):
     ema12 = series.ewm(span=12, adjust=False).mean()
@@ -123,6 +111,7 @@ def detect_divergence_direction(df):
     if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
         return "Bearish"
     return ""
+
 def detect_trend_reversal(df):
     if len(df) < 3:
         return ""
@@ -202,6 +191,7 @@ for label, symbol in symbols.items():
         df['EMA9'] = calculate_ema(df['close'], 9)
         df['EMA20'] = calculate_ema(df['close'], 20)
         df['ADX'] = calculate_adx(df)
+        df['ATR'] = calculate_atr(df)
         df = df.dropna()
 
         price_now = df['close'].iloc[-1]
@@ -210,12 +200,10 @@ for label, symbol in symbols.items():
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
 
-        # ✅ Corrected signal age logic
         signal_time = pd.to_datetime(df.index[-1])
         now = datetime.now()
         age_minutes = int((now - signal_time).total_seconds() / 60)
         age_minutes = max(0, age_minutes)
-
 
         indicators = []
         if direction:
@@ -246,17 +234,24 @@ for label, symbol in symbols.items():
         advice = generate_advice(trend, direction, ai_suggestion, tf_status)
 
         rows.append({
-            "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
-            "Trend": trend, "Divergence": direction, "TF": tf_status,
+            "Pair": label,
+            "Price": round(price_now, 5),
+            "RSI": round(df['RSI'].iloc[-1], 2),
+            "ATR": round(df['ATR'].iloc[-1], 5),
+            "Trend": trend,
+            "Divergence": direction,
+            "TF": tf_status,
             "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators),
             "Volume Spike": "Yes" if volume_spike else "No",
             "Signal Age": f"{age_minutes} min ago",
-            "AI Suggestion": ai_suggestion, "Advice": advice,
+            "AI Suggestion": ai_suggestion,
+            "Advice": advice,
             "News Alert": check_news_alert(label)
         })
+
 column_order = [
-    "Pair", "Price", "RSI", "Trend", "Divergence", "TF", "Reversal Signal",
+    "Pair", "Price", "RSI", "ATR", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Volume Spike", "Signal Age", "AI Suggestion", "Advice", "News Alert"
 ]
 
@@ -275,14 +270,14 @@ def style_row(row):
         pd.notna(ai) and "Confidence: Strong" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #add8e6;'  # Light blue for strong match
+        return 'background-color: #add8e6;'
     if (
         pd.notna(ai) and "Confidence: Medium" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #ccffcc;'  # Light green for medium match
+        return 'background-color: #ccffcc;'
     if "Reversal" in row['Reversal Signal']:
-        return 'background-color: #fff0b3;'  # Yellow for reversal
+        return 'background-color: #fff0b3;'
     return ''
 
 def trend_color_text(trend):
@@ -305,7 +300,6 @@ for _, row in df_sorted.iterrows():
     styled_html += "</tr>"
 styled_html += "</table>"
 
-# ✅ Final display
 st.markdown(styled_html, unsafe_allow_html=True)
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
