@@ -1,3 +1,10 @@
+st.subheader("🔍 Debug: Checking EUR/USD API Connection")
+test_df = fetch_data("EUR/USD", interval="15min")
+if test_df is None:
+    st.error("❌ API returned no data for EUR/USD. Check your TwelveData API key or internet.")
+else:
+    st.success("✅ API connected. Showing last candles for EUR/USD:")
+    st.dataframe(test_df.tail())
 # --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
