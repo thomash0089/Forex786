@@ -241,11 +241,9 @@ st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if
 if candle_age != "" and int(candle_age) > 2:
     direction = ""
     ai_suggestion = ""
-
-        
-
-        pattern = detect_candle_pattern(df)
-        candle_pattern = pattern if pattern else "—"
+     
+ pattern = detect_candle_pattern(df)
+  candle_pattern = pattern if pattern else "—"
         indicators = []
         if direction:
             indicators.append("RSI")
