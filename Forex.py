@@ -142,7 +142,6 @@ def detect_divergence_direction(df):
     elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
         return "Reversal Forming Bearish"
     return ""
-
 def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     if not direction:
         return ""
