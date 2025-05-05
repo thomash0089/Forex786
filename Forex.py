@@ -347,7 +347,7 @@ for label, symbol in symbols.items():
             "Confirmed Indicators": ", ".join(indicators),
             "Candle Pattern": candle_pattern,
             "Volume Spike": "Yes" if volume_spike else "No",
-            "Signal Age": f"{candle_age} candles ago" if candle_age else "—",
+            "Candle Age": f"{candle_age} candles ago" if candle_age else "—",
             "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
