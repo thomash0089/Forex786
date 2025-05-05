@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | Final Version with Fixes) ---
+# --- Signals with H & I (15-Min Timeframe | Signal Age Added) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -30,6 +30,7 @@ news_events = {
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
 }
 
+# --- Indicator Calculation Functions ---
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -153,7 +154,7 @@ def detect_trend_reversal(df):
         return "Reversal Forming Bearish"
     return ""
 
-# --------------------- Build Table Rows ---------------------
+# --- Build Rows ---
 rows = []
 for label, symbol in symbols.items():
     df = fetch_data(symbol)
@@ -164,11 +165,14 @@ for label, symbol in symbols.items():
         df['EMA20'] = calculate_ema(df['close'], 20)
         df['ADX'] = calculate_adx(df)
         df = df.dropna()
+
         price = df['close'].iloc[-1]
         dir = detect_divergence_direction(df)
         tf = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
+        signal_time = df.index[-1]
+        age_minutes = int((datetime.now() - signal_time).total_seconds() / 60)
 
         indicators = []
         if dir:
@@ -194,13 +198,14 @@ for label, symbol in symbols.items():
             "Pair": label, "Price": round(price, 5), "RSI": round(df['RSI'].iloc[-1], 2),
             "Trend": trend, "Divergence": dir, "TF": tf, "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators), "Volume Spike": "Yes" if volume_spike else "No",
+            "Signal Age": f"{age_minutes} min ago",
             "AI Suggestion": ai, "Advice": advice, "News Alert": check_news_alert(label)
         })
 
-# --------------------- Table Display ---------------------
+# --- Table Display ---
 column_order = [
     "Pair", "Price", "RSI", "Trend", "Divergence", "TF", "Reversal Signal",
-    "Confirmed Indicators", "Volume Spike", "AI Suggestion", "Advice", "News Alert"
+    "Confirmed Indicators", "Volume Spike", "Signal Age", "AI Suggestion", "Advice", "News Alert"
 ]
 
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
