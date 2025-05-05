@@ -286,3 +286,42 @@ st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
 st.text(f"Strong Signals Found: {len(strongs)}")
+def calculate_rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+def calculate_atr(df, period=14):
+    tr1 = df['high'] - df['low']
+    tr2 = abs(df['high'] - df['close'].shift())
+    tr3 = abs(df['low'] - df['close'].shift())
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+    return atr
+
+def calculate_macd(series):
+    ema12 = series.ewm(span=12, adjust=False).mean()
+    ema26 = series.ewm(span=26, adjust=False).mean()
+    macd = ema12 - ema26
+    signal = macd.ewm(span=9, adjust=False).mean()
+    return macd, signal
+
+def calculate_ema(series, period):
+    return series.ewm(span=period, adjust=False).mean()
+
+def calculate_adx(df, period=14):
+    df['TR'] = np.maximum(df['high'] - df['low'], np.maximum(abs(df['high'] - df['close'].shift()), abs(df['low'] - df['close'].shift())))
+    df['+DM'] = np.where((df['high'] - df['high'].shift()) > (df['low'].shift() - df['low']), np.maximum(df['high'] - df['high'].shift(), 0), 0)
+    df['-DM'] = np.where((df['low'].shift() - df['low']) > (df['high'] - df['high'].shift()), np.maximum(df['low'].shift() - df['low'], 0), 0)
+    tr14 = df['TR'].rolling(window=period).mean()
+    plus_dm14 = df['+DM'].rolling(window=period).mean()
+    minus_dm14 = df['-DM'].rolling(window=period).mean()
+    plus_di14 = 100 * (plus_dm14 / tr14)
+    minus_di14 = 100 * (minus_dm14 / tr14)
+    dx = 100 * abs(plus_di14 - minus_di14) / (plus_di14 + minus_di14)
+    adx = dx.rolling(window=period).mean()
+    return adx
