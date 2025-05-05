@@ -466,10 +466,12 @@ def detect_candle_pattern(df):
         # Debugging: Check the values of body, range, and wick lengths
         st.write(f"Body: {body}, Range: {range_}, Upper Wick: {upper_wick}, Lower Wick: {lower_wick}")
 
-        # Simplified pattern detection (for debugging)
-        if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
+        # Adjusted condition for detecting a Doji pattern
+        # A Doji should have a small body and long upper/lower wicks
+        if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.2 and lower_wick > range_ * 0.2:
             return "Doji", "images/doji.png"
         
+        # Adjusted condition for Bullish Engulfing
         if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
             return "Bullish Engulfing", "images/bullish_engulfing.png"
 
@@ -523,6 +525,7 @@ candle_pattern_styled_html += "</table>"
 
 # Display the table below the main table
 st.markdown(candle_pattern_styled_html, unsafe_allow_html=True)
+
 
 
 
