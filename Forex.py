@@ -91,50 +91,32 @@ def detect_volume_spike(df):
     return last_vol > 1.5 * avg_vol
 
 def detect_candle_pattern(df):
-    if len(df) < 5:
-        return ""
+    o, c, h, l = df['open'].iloc[-4:], df['close'].iloc[-4:], df['high'].iloc[-4:], df['low'].iloc[-4:]
+    current_open = o.iloc[-1]
+    current_close = c.iloc[-1]
+    current_high = h.iloc[-1]
+    current_low = l.iloc[-1]
+    body = abs(current_close - current_open)
+    range_ = current_high - current_low
+    previous_open = o.iloc[-2]
+    previous_close = c.iloc[-2]
 
-    # Get candle data
-    o = df['open'].iloc[-2:]
-    c = df['close'].iloc[-2:]
-    h = df['high'].iloc[-2:]
-    l = df['low'].iloc[-2:]
+    # Determine simple 3-candle trend
+    trend_up = c.iloc[0] < c.iloc[1] < c.iloc[2]
+    trend_down = c.iloc[0] > c.iloc[1] > c.iloc[2]
 
-    prev_open, prev_close = o.iloc[0], c.iloc[0]
-    curr_open, curr_close = o.iloc[1], c.iloc[1]
-    curr_high, curr_low = h.iloc[1], l.iloc[1]
-
-    body = abs(curr_close - curr_open)
-    range_ = curr_high - curr_low
-    upper_wick = curr_high - max(curr_open, curr_close)
-    lower_wick = min(curr_open, curr_close) - curr_low
-
-    # Detect prior trend using past 3 candles
-    trend_check = df['close'].iloc[-5:-2]
-    uptrend = all(x < y for x, y in zip(trend_check, trend_check[1:]))
-    downtrend = all(x > y for x, y in zip(trend_check, trend_check[1:]))
-
-    # Doji
-    if body < range_ * 0.1 and upper_wick > body and lower_wick > body:
+    if body < range_ * 0.1:
         return "Doji"
-
-    # Bullish Engulfing
-    if prev_close < prev_open and curr_close > curr_open and curr_close > prev_open and curr_open < prev_close:
+    if trend_up and previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
         return "Bullish Engulfing"
-
-    # Bearish Engulfing
-    if prev_close > prev_open and curr_close < curr_open and curr_open > prev_close and curr_close < prev_open:
+    if trend_down and previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
         return "Bearish Engulfing"
-
-    # Hammer (valid only after downtrend)
-    if downtrend and body / range_ < 0.3 and lower_wick > 2 * body and upper_wick < body:
+    if trend_down and body < range_ * 0.3 and (current_low < current_open and current_low < current_close) and (current_high - max(current_open, current_close)) < body:
         return "Hammer"
-
-    # Shooting Star (valid only after uptrend)
-    if uptrend and body / range_ < 0.3 and upper_wick > 2 * body and lower_wick < body:
+    if trend_up and body < range_ * 0.3 and (current_high > current_open and current_high > current_close) and (min(current_open, current_close) - current_low) < body:
         return "Shooting Star"
-
     return ""
+
 
 def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
