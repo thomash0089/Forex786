@@ -420,6 +420,122 @@ strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
 st.text(f"Strong Signals Found: {len(strongs)}")
 
 
+import streamlit as st
+import pandas as pd
+import requests
+from datetime import datetime
+from pytz import timezone
+
+# --- API Key and Symbols ---
+API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
+symbols = {
+    "EUR/USD": "EUR/USD", "GBP/USD": "GBP/USD", "USD/JPY": "USD/JPY",
+    "AUD/USD": "AUD/USD", "USD/CAD": "USD/CAD", "USD/CHF": "USD/CHF",
+    "XAU/USD": "XAU/USD", "WTI/USD": "WTI/USD", "EUR/JPY": "EUR/JPY", "NZD/USD": "NZD/USD"
+}
+
+# --- Fetch Data Function ---
+def fetch_data(symbol, interval="15min", outputsize=200):
+    url = "https://api.twelvedata.com/time_series"
+    params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
+    r = requests.get(url, params=params)
+    data = r.json()
+    if "values" not in data:
+        return None
+    df = pd.DataFrame(data["values"])
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df.set_index("datetime", inplace=True)
+    df = df.astype(float).sort_index()
+    return df
+
+# --- Candlestick Pattern Detection ---
+def detect_candle_pattern(df):
+    o, c, h, l = df['open'].iloc[-4:], df['close'].iloc[-4:], df['high'].iloc[-4:], df['low'].iloc[-4:]
+    current_open = o.iloc[-1]
+    current_close = c.iloc[-1]
+    current_high = h.iloc[-1]
+    current_low = l.iloc[-1]
+    body = abs(current_close - current_open)
+    range_ = current_high - current_low
+    previous_open = o.iloc[-2]
+    previous_close = c.iloc[-2]
+    upper_wick = current_high - max(current_open, current_close)
+    lower_wick = min(current_open, current_close) - current_low
+
+    # Doji: Small body, large wicks
+    if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
+        return "Doji"
+    
+    # Bullish Engulfing: Large bull candle fully engulfs previous bear candle
+    if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
+        return "Bullish Engulfing"
+    
+    # Bearish Engulfing: Large bear candle fully engulfs previous bull candle
+    if previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
+        return "Bearish Engulfing"
+    
+    # Hammer: Small body at the top with long lower wick
+    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
+        return "Hammer"
+    
+    # Hanging Man: Same as Hammer, but occurs in an uptrend
+    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
+        return "Hanging Man"
+    
+    # Shooting Star: Small body at the bottom with long upper wick
+    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
+        return "Shooting Star"
+    
+    # Morning Star: A three-candle pattern with a large bear, small indecisive candle, and large bull candle
+    if previous_close > previous_open and current_open > current_close and current_close > previous_open:
+        return "Morning Star"
+    
+    # Evening Star: A three-candle pattern with a large bull, small indecisive candle, and large bear candle
+    if previous_close < previous_open and current_open < current_close and current_close < previous_open:
+        return "Evening Star"
+    
+    # Bullish Harami: Small bull candle within a large bear candle
+    if previous_close > previous_open and current_close < current_open and current_open > previous_close:
+        return "Bullish Harami"
+    
+    # Bearish Harami: Small bear candle within a large bull candle
+    if previous_close < previous_open and current_close > current_open and current_open < previous_close:
+        return "Bearish Harami"
+    
+    # Bullish Abandoned Baby: A bullish gap-up with a Doji
+    if previous_close < previous_open and current_open > previous_close and abs(current_open - current_close) < body:
+        return "Bullish Abandoned Baby"
+    
+    # Bearish Abandoned Baby: A bearish gap-down with a Doji
+    if previous_close > previous_open and current_open < previous_close and abs(current_open - current_close) < body:
+        return "Bearish Abandoned Baby"
+    
+    # Piercing Line: Bullish pattern where a large bear candle is followed by a large bull candle
+    if previous_close < previous_open and current_open < previous_close and current_close > (previous_open + previous_close) / 2:
+        return "Piercing Line"
+    
+    # Dark Cloud Cover: Bearish pattern where a large bull candle is followed by a large bear candle
+    if previous_close > previous_open and current_open > previous_close and current_close < (previous_open + previous_close) / 2:
+        return "Dark Cloud Cover"
+    
+    # Three White Soldiers: Three consecutive bullish candles with higher closes
+    if current_close > current_open and previous_close < previous_open and previous_open < current_close:
+        return "Three White Soldiers"
+    
+    # Three Black Crows: Three consecutive bearish candles with lower closes
+    if current_close < current_open and previous_close > previous_open and previous_open > current_close:
+        return "Three Black Crows"
+    
+    # Spinning Top: Small body with long wicks (indicating indecision)
+    if body < range_ * 0.3 and upper_wick > body and lower_wick > body:
+        return "Spinning Top"
+    
+    # Marubozu: No wicks (either bullish or bearish)
+    if upper_wick == 0 and lower_wick == 0:
+        return "Marubozu"
+
+    return ""
+
 # ---------------- Candle Pattern Section ---------------- #
 # Detect candle patterns and display separately
 
@@ -444,7 +560,6 @@ st.markdown("<h2 style='text-align:center; color:#007acc;'>📊 Candle Patterns 
 candle_pattern_styled_html = "<table style='width:100%; border-collapse: collapse;'>"
 candle_pattern_styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" for col in ["Pair", "Candle Pattern"]]) + "</tr>"
 
-# Loop through each row and add it to the table
 for _, row in pd.DataFrame(candle_pattern_rows).iterrows():
     candle_pattern_styled_html += f"<tr>"
     for col in ["Pair", "Candle Pattern"]:
@@ -458,4 +573,5 @@ candle_pattern_styled_html += "</table>"
 
 # Display the table below the main table
 st.markdown(candle_pattern_styled_html, unsafe_allow_html=True)
+
 
