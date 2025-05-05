@@ -163,7 +163,6 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
             if dir:
                 return f"Confirm {dir}"
     return ""
-
 def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
     if not divergence:
         return "No signal detected — wait"
