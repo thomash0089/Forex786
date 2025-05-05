@@ -423,6 +423,7 @@ st.text(f"Strong Signals Found: {len(strongs)}")
 import streamlit as st
 import pandas as pd
 import requests
+import talib
 from datetime import datetime
 from pytz import timezone
 
@@ -448,56 +449,43 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     df = df.astype(float).sort_index()
     return df
 
-# --- Candlestick Pattern Detection ---
-def detect_candle_pattern(df):
-    try:
-        o, c, h, l = df['open'].iloc[-4:], df['close'].iloc[-4:], df['high'].iloc[-4:], df['low'].iloc[-4:]
-        current_open = o.iloc[-1]
-        current_close = c.iloc[-1]
-        current_high = h.iloc[-1]
-        current_low = l.iloc[-1]
-        body = abs(current_close - current_open)
-        range_ = current_high - current_low
-        previous_open = o.iloc[-2]
-        previous_close = c.iloc[-2]
-        upper_wick = current_high - max(current_open, current_close)
-        lower_wick = min(current_open, current_close) - current_low
-
-        # Debugging: Check the values of body, range, and wick lengths
-        st.write(f"Body: {body}, Range: {range_}, Upper Wick: {upper_wick}, Lower Wick: {lower_wick}")
-
-        # Adjusted condition for detecting a Doji pattern
-        # A Doji should have a small body and long upper/lower wicks
-        if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.2 and lower_wick > range_ * 0.2:
-            return "Doji", "images/doji.png"
-        
-        # Adjusted condition for Bullish Engulfing
-        if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
-            return "Bullish Engulfing", "images/bullish_engulfing.png"
-
-        return "—", ""  # No pattern found
-    except Exception as e:
-        st.write(f"Error detecting pattern: {e}")
-        return "Error", ""
+# --- Candlestick Pattern Detection using TA-Lib ---
+def detect_candle_patterns(df):
+    patterns = {
+        "CDLDOJI": talib.CDLDOJI,
+        "CDLENGULFING": talib.CDLENGULFING,
+        "CDLBELTHOLD": talib.CDLBELTHOLD,
+        "CDLHAMMER": talib.CDLHAMMER,
+        "CDLSHOOTINGSTAR": talib.CDLSHOOTINGSTAR,
+    }
+    
+    # Store the detected patterns
+    detected_patterns = {}
+    
+    for name, func in patterns.items():
+        result = func(df['open'], df['high'], df['low'], df['close'])
+        # If the result is non-zero, the pattern is detected
+        detected_patterns[name] = result[result != 0]
+    
+    return detected_patterns
 
 # ---------------- Candle Pattern Section ---------------- #
 # Detect candle patterns and display separately
-
 candle_pattern_rows = []
 
 for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
     if df is not None:
-        # Detect the current candle pattern for each pair
-        pattern_name, pattern_image = detect_candle_pattern(df)
+        detected_patterns = detect_candle_patterns(df)
         
-        # Debugging: Print the detected pattern and image for each pair
-        st.write(f"Pair: {label}, Pattern: {pattern_name}, Image: {pattern_image}")  # Debugging
+        # Log detected patterns
+        st.write(f"Pair: {label}, Detected Patterns: {detected_patterns}")
         
+        # Prepare the row to display in the table
+        patterns_display = ", ".join([key for key, value in detected_patterns.items() if not value.empty])
         candle_pattern_rows.append({
-            "Pair": label, 
-            "Candle Pattern": pattern_name,
-            "Image": pattern_image
+            "Pair": label,
+            "Candle Patterns": patterns_display
         })
 
 # ---------------- Display Candle Pattern Table ---------------- #
@@ -505,20 +493,15 @@ st.markdown("<h2 style='text-align:center; color:#007acc;'>📊 Candle Patterns 
 
 # Create the HTML table for the candle patterns
 candle_pattern_styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-candle_pattern_styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" for col in ["Pair", "Candle Pattern", "Pattern Image"]]) + "</tr>"
+candle_pattern_styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" for col in ["Pair", "Candle Patterns"]]) + "</tr>"
 
 for _, row in pd.DataFrame(candle_pattern_rows).iterrows():
     candle_pattern_styled_html += f"<tr>"
-    for col in ["Pair", "Candle Pattern"]:
+    for col in ["Pair", "Candle Patterns"]:
         val = row[col]
         if col == "Pair":
             val = f"<strong style='font-size: 18px;'>{val}</strong>"
         candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
-    
-    # Add the image for the detected pattern
-    candle_pattern_styled_html += f"<td style='border: 1px solid #ccc; padding: 6px; text-align:center;'>" \
-                             f"<img src='{row['Image']}' alt='{row['Candle Pattern']}' width='50'></td>"
-    
     candle_pattern_styled_html += "</tr>"
 
 candle_pattern_styled_html += "</table>"
