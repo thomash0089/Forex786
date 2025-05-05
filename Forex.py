@@ -1,4 +1,4 @@
-# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name) ---
+# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Safe Filters) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -93,18 +93,14 @@ def detect_volume_spike(df):
 
 def detect_candle_pattern(df):
     o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
-
     current_open = o.iloc[-1]
     current_close = c.iloc[-1]
     current_high = h.iloc[-1]
     current_low = l.iloc[-1]
-
     body = abs(current_close - current_open)
     range_ = current_high - current_low
-
     previous_open = o.iloc[-2]
     previous_close = c.iloc[-2]
-
     if body < range_ * 0.1:
         return "Doji"
     if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
@@ -159,8 +155,7 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     else:
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
-
-def get_tf_confirmation(symbol):
+    def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
         df = fetch_data(symbol, interval=tf)
         if df is not None:
@@ -216,16 +211,18 @@ for label, symbol in symbols.items():
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
         
         direction = detect_divergence_direction(df)
-        recent = df['RSI'].iloc[-2:]
-
-        if direction == "Bullish" and all(r < 50 for r in recent):
-            direction = ""
-        if direction == "Bearish" and all(r > 50 for r in recent):
-            direction = ""
-
-        tf_status = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
+
+        # ✅ Apply updated filters
+        if direction == "Bullish":
+            if df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal:
+                direction = ""
+        if direction == "Bearish":
+            if df['RSI'].iloc[-1] > 50 or not volume_spike or "Forming" in reversal:
+                direction = ""
+
+        tf_status = get_tf_confirmation(symbol)
 
         signal_time = pd.to_datetime(df.index[-1])
         now = datetime.now()
@@ -274,7 +271,8 @@ for label, symbol in symbols.items():
             "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
-     # ---------------- Table Layout ---------------- #
+
+# ---------------- Table Layout ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
@@ -311,10 +309,8 @@ def trend_color_text(trend):
     return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
 
 df_result = pd.DataFrame(rows)
-if "Pair" in df_result.columns:
-    df_sorted = df_result.sort_values(by="Pair", na_position='last')
-else:
-    df_sorted = df_result
+df_sorted = df_result.sort_values(by="Pair", na_position='last') if "Pair" in df_result.columns else df_result
+
 for _, row in df_sorted.iterrows():
     style = style_row(row)
     styled_html += f"<tr style='{style}'>"
