@@ -4,3 +4,4 @@ requests
 numpy
 scipy
 streamlit-autorefresh
+pytz
