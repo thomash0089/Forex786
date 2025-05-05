@@ -69,26 +69,17 @@ def detect_candle_pattern(df):
     o1, h1, l1, c1 = df['open'].iloc[-2], df['high'].iloc[-2], df['low'].iloc[-2], df['close'].iloc[-2]
     o2, h2, l2, c2 = df['open'].iloc[-1], df['high'].iloc[-1], df['low'].iloc[-1], df['close'].iloc[-1]
 
-    # Bullish Engulfing
-    if c2 > o2 and o2 < c1 and c2 > o1 and c1 < o1:
-        return "Bullish Engulfing"
-
-    # Bearish Engulfing
-    if o2 > c2 and o2 > c1 and c2 < o1 and c1 > o1:
-        return "Bearish Engulfing"
-
-    # Hammer
     body = abs(c2 - o2)
     candle_range = h2 - l2
-    lower_shadow = min(o2, c2) - l2
-    if body < candle_range * 0.3 and lower_shadow > body * 2:
+
+    if c2 > o2 and o2 < c1 and c2 > o1 and c1 < o1:
+        return "Bullish Engulfing"
+    if o2 > c2 and o2 > c1 and c2 < o1 and c1 > o1:
+        return "Bearish Engulfing"
+    if body < candle_range * 0.3 and min(o2, c2) - l2 > body * 2:
         return "Hammer"
-
-    # Shooting Star
-    upper_shadow = h2 - max(o2, c2)
-    if body < candle_range * 0.3 and upper_shadow > body * 2:
+    if body < candle_range * 0.3 and h2 - max(o2, c2) > body * 2:
         return "Shooting Star"
-
     return ""
 
 def detect_divergence_direction(df):
@@ -198,7 +189,7 @@ for label, symbol in symbols.items():
         )
 
         tf_match = (direction == "Bullish" and "Confirm Bullish" in tf_status) or (
-                    direction == "Bearish" and "Confirm Bearish" in tf_status)
+                   direction == "Bearish" and "Confirm Bearish" in tf_status)
         ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_match)
         advice = ai_suggestion if ai_suggestion else "No suggestion"
 
@@ -210,6 +201,10 @@ for label, symbol in symbols.items():
             "AI Suggestion": ai_suggestion, "Advice": advice
         })
 
-df_sorted = pd.DataFrame(rows).sort_values(by="Pair")
-st.dataframe(df_sorted, use_container_width=True)
-st.caption(f"Updated with Volume + Candle Pattern | Time: {datetime.now().strftime('%H:%M:%S')}")
+# --- Final Display Block with Error Handling ---
+if rows:
+    df_sorted = pd.DataFrame(rows).sort_values(by="Pair")
+    st.dataframe(df_sorted, use_container_width=True)
+    st.caption(f"Updated with Volume + Candle Pattern | Time: {datetime.now().strftime('%H:%M:%S')}")
+else:
+    st.warning("No data available to display at the moment.")
