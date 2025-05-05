@@ -30,7 +30,6 @@ news_events = {
     "EUR/JPY": [{"time": "09:00", "title": "ECB Bulletin"}],
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
 }
-
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -112,7 +111,6 @@ def detect_candle_pattern(df):
     if body < range_ * 0.3 and (current_high > current_open and current_high > current_close) and (min(current_open, current_close) - current_low) < body:
         return "Shooting Star"
     return ""
-
 def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
     df = df.dropna()
@@ -140,6 +138,15 @@ def detect_trend_reversal(df):
         return "Reversal Forming Bearish"
     return ""
 
+def get_tf_confirmation(symbol):
+    for tf in ["5min", "15min", "1h"]:
+        df = fetch_data(symbol, interval=tf)
+        if df is not None:
+            dir = detect_divergence_direction(df)
+            if dir:
+                return f"Confirm {dir}"
+    return ""
+
 def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     if not direction:
         return ""
@@ -155,28 +162,6 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     else:
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
-
-def get_tf_confirmation(symbol):
-    for tf in ["5min", "15min", "1h"]:
-        df = fetch_data(symbol, interval=tf)
-        if df is not None:
-            dir = detect_divergence_direction(df)
-            if dir:
-                return f"Confirm {dir}"
-    return ""
-   def generate_ai_suggestion(...):
-    ...
-    return suggestion_string
-
-# ⬇ This must be outside of any function
-def get_tf_confirmation(symbol):
-    for tf in ["5min", "15min", "1h"]:
-        df = fetch_data(symbol, interval=tf)
-        if df is not None:
-            dir = detect_divergence_direction(df)
-            if dir:
-                return f"Confirm {dir}"
-    return ""
 
 def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
     if not divergence:
@@ -206,7 +191,6 @@ def check_news_alert(pair):
         except:
             continue
     return " | ".join(alert_list) if alert_list else ""
-
 # ---------------- Table Rows ---------------- #
 rows = []
 for label, symbol in symbols.items():
@@ -228,7 +212,7 @@ for label, symbol in symbols.items():
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
 
-        # ✅ Apply updated filters
+        # ✅ Apply Safe Filters
         if direction == "Bullish":
             if df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal:
                 direction = ""
@@ -285,8 +269,7 @@ for label, symbol in symbols.items():
             "AI Suggestion": ai_suggestion, "Advice": advice,
             "News Alert": check_news_alert(label)
         })
-
-# ---------------- Table Layout ---------------- #
+# ---------------- Table Layout & Display ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
@@ -308,14 +291,14 @@ def style_row(row):
         pd.notna(ai) and "Confidence: Strong" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #add8e6;'
+        return 'background-color: #add8e6;'  # Light Blue for Strong match
     if (
         pd.notna(ai) and "Confidence: Medium" in ai and trend == div
         and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
     ):
-        return 'background-color: #ccffcc;'
+        return 'background-color: #ccffcc;'  # Light Green for Medium
     if "Reversal" in row['Reversal Signal']:
-        return 'background-color: #fff0b3;'
+        return 'background-color: #fff0b3;'  # Yellow for Reversal Signal
     return ''
 
 def trend_color_text(trend):
@@ -340,6 +323,7 @@ for _, row in df_sorted.iterrows():
 styled_html += "</table>"
 st.markdown(styled_html, unsafe_allow_html=True)
 
+# Footer Info
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
