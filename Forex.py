@@ -278,9 +278,10 @@ for label, symbol in symbols.items():
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
 
         direction = detect_divergence_direction(df)
-        st.text(f"{label} | Dir: {direction} | RSI: {df['RSI'].iloc[-1]:.2f} | Vol Spike: {volume_spike}")
         reversal = detect_trend_reversal(df)
         volume_spike = detect_volume_spike(df)
+         st.text(f"{label} | Dir: {direction} | RSI: {df['RSI'].iloc[-1]:.2f} | Vol Spike: {volume_spike}")
+
 
         #if direction == "Bullish":
             #if df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal:
