@@ -232,7 +232,7 @@ for label, symbol in symbols.items():
             candle_age = ""
 
         # Debug
-        st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if candle_age and int(candle_age) > 2 else 'OK'}")
+        #st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if candle_age and int(candle_age) > 2 else 'OK'}")
 
         # Skip old signals
         if candle_age != "" and int(candle_age) > 2:
