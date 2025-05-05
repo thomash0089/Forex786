@@ -30,6 +30,7 @@ news_events = {
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
 }
 
+# --- Indicator Functions ---
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -127,8 +128,7 @@ def detect_divergence_direction(df):
     if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
         return "Bearish"
     return ""
-
-def detect_trend_reversal(df):
+    def detect_trend_reversal(df):
     if len(df) < 3:
         return ""
     e9 = df['EMA9'].iloc[-3:]
@@ -215,30 +215,25 @@ for label, symbol in symbols.items():
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
 
         direction = detect_divergence_direction(df)
-if direction:
-    recent = df['RSI'].iloc[-2:]
-    if direction == "Bullish" and all(r < 50 for r in recent):
-        direction = ""
-    if direction == "Bearish" and all(r > 50 for r in recent):
-        direction = ""
-    if direction == "Bullish" and all(r < 50 for r in recent):
-        direction = ""
-    if direction == "Bearish" and all(r > 50 for r in recent):
-        direction = ""
-        tf_status = get_tf_confirmation(symbol)
-        reversal = detect_trend_reversal(df)
-        volume_spike = detect_volume_spike(df)
+        recent = df['RSI'].iloc[-2:]
+        if direction == "Bullish" and all(r < 50 for r in recent):
+            direction = ""
+        if direction == "Bearish" and all(r > 50 for r in recent):
+            direction = ""
 
-        signal_time = pd.to_datetime(df.index[-1])
-        now = datetime.now()
-        age_minutes = int((now - signal_time).total_seconds() / 60)
-        age_minutes = max(0, age_minutes)
-
-        pattern = detect_candle_pattern(df)
-        candle_pattern = pattern if pattern else "—"
-
-        indicators = []
         if direction:
+            tf_status = get_tf_confirmation(symbol)
+            reversal = detect_trend_reversal(df)
+            volume_spike = detect_volume_spike(df)
+            pattern = detect_candle_pattern(df)
+            candle_pattern = pattern if pattern else "—"
+
+            signal_time = pd.to_datetime(df.index[-1])
+            now = datetime.now()
+            age_minutes = int((now - signal_time).total_seconds() / 60)
+            age_minutes = max(0, age_minutes)
+
+            indicators = []
             indicators.append("RSI")
             if direction == "Bullish" and df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
                 indicators.append("MACD")
@@ -255,29 +250,29 @@ if direction:
             if direction in pattern:
                 indicators.append("Candle")
 
-        trend = (
-            "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
-            else "Bearish" if df['EMA9'].iloc[-1] < df['EMA20'].iloc[-1] and price_now < df['EMA9'].iloc[-1]
-            else "Sideways"
-        )
+            trend = (
+                "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
+                else "Bearish" if df['EMA9'].iloc[-1] < df['EMA20'].iloc[-1] and price_now < df['EMA9'].iloc[-1]
+                else "Sideways"
+            )
 
-        ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
-        advice = generate_advice(trend, direction, ai_suggestion, tf_status)
+            ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
+            advice = generate_advice(trend, direction, ai_suggestion, tf_status)
 
-        rows.append({
-            "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
-            "ATR": round(atr_value, 5), "ATR Status": atr_status,
-            "Trend": trend, "Divergence": direction, "TF": tf_status,
-            "Reversal Signal": reversal,
-            "Confirmed Indicators": ", ".join(indicators),
-            "Candle Pattern": candle_pattern,
-            "Volume Spike": "Yes" if volume_spike else "No",
-            "Signal Age": f"{age_minutes} min ago",
-            "AI Suggestion": ai_suggestion, "Advice": advice,
-            "News Alert": check_news_alert(label)
-        })
+            rows.append({
+                "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
+                "ATR": round(atr_value, 5), "ATR Status": atr_status,
+                "Trend": trend, "Divergence": direction, "TF": tf_status,
+                "Reversal Signal": reversal,
+                "Confirmed Indicators": ", ".join(indicators),
+                "Candle Pattern": candle_pattern,
+                "Volume Spike": "Yes" if volume_spike else "No",
+                "Signal Age": f"{age_minutes} min ago",
+                "AI Suggestion": ai_suggestion, "Advice": advice,
+                "News Alert": check_news_alert(label)
+            })
 
-# ---------------- Table Layout ---------------- #
+# ---------------- Table Display ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
     "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
@@ -318,6 +313,7 @@ if "Pair" in df_result.columns:
     df_sorted = df_result.sort_values(by="Pair", na_position='last')
 else:
     df_sorted = df_result
+
 for _, row in df_sorted.iterrows():
     style = style_row(row)
     styled_html += f"<tr style='{style}'>"
