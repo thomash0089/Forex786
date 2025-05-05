@@ -59,7 +59,13 @@ def calculate_macd(series):
     macd = ema12 - ema26
     signal = macd.ewm(span=9, adjust=False).mean()
     return macd, signal
-
+def calculate_atr(df, period=14):
+    tr1 = df['high'] - df['low']
+    tr2 = abs(df['high'] - df['close'].shift())
+    tr3 = abs(df['low'] - df['close'].shift())
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+    return atr
 def calculate_ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
 
