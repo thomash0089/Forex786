@@ -216,10 +216,11 @@ for label, symbol in symbols.items():
 
         direction = detect_divergence_direction(df)
         if direction:
-        recent = df['RSI'].iloc[-2:]
-        if direction == "Bullish" and all(r < 50 for r in recent):
+        if direction:
+    recent = df['RSI'].iloc[-2:]
+    if direction == "Bullish" and all(r < 50 for r in recent):
         direction = ""
-        if direction == "Bearish" and all(r > 50 for r in recent):
+    if direction == "Bearish" and all(r > 50 for r in recent):
         direction = ""
         tf_status = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
