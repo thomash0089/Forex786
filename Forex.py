@@ -9,6 +9,7 @@ from scipy.signal import argrelextrema
 from pytz import timezone
 
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
+st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>", unsafe_allow_html=True)
 st_autorefresh(interval=120000, key="auto_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
