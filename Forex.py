@@ -282,13 +282,10 @@ for label, symbol in symbols.items():
         volume_spike = detect_volume_spike(df)
         st.text(f"{label} | Dir: {direction} | RSI: {df['RSI'].iloc[-1]:.2f} | Vol Spike: {volume_spike}")
      
-        #if direction == "Bullish":
-            #if df['RSI'].iloc[-1] < 50 or not volume_spike or "Forming" in reversal:
-                #direction = ""
-        #if direction == "Bearish":
-            #if df['RSI'].iloc[-1] > 50 or not volume_spike or "Forming" in reversal:
-                #direction = ""
-
+        if direction == "Bullish" and "Forming" in reversal:
+    direction = ""
+if direction == "Bearish" and "Forming" in reversal:
+    direction = ""
         tf_status = get_tf_confirmation(symbol)
 
         # 🕓 Candle Age
