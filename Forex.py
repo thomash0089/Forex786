@@ -271,7 +271,7 @@ for label, symbol in symbols.items():
                 if df['ADX'].iloc[-1] > 20:
                     indicators.append("ADX")
                 if volume_spike:
-                    indicators.append("Volume")
+                            indicators.append("Volume")
                 if direction in pattern:
                     indicators.append("Candle")
 
