@@ -8,6 +8,29 @@ from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
 from pytz import timezone
 
+# Add caching decorator to the function
+@st.cache
+def fetch_data(symbol, interval="15min", outputsize=200):
+    url = "https://api.twelvedata.com/time_series"
+    params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
+    try:
+        r = requests.get(url, params=params)
+        r.raise_for_status()  # Check if request was successful
+        data = r.json()
+        if "values" not in data:
+            raise ValueError(f"No data found for {symbol}")
+        df = pd.DataFrame(data["values"])
+        df["datetime"] = pd.to_datetime(df["datetime"])
+        df.set_index("datetime", inplace=True)
+        df = df.astype(float).sort_index()
+        return df
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data for {symbol}: {e}")
+        return None
+    except ValueError as e:
+        print(f"Error: {e}")
+        return None
+                
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
 st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>",
             unsafe_allow_html=True)
@@ -44,8 +67,10 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     df["datetime"] = pd.to_datetime(df["datetime"])
     df.set_index("datetime", inplace=True)
     df = df.astype(float).sort_index()
-    return df
 
+    # Fill missing data
+    df.fillna(method='ffill', inplace=True)
+    return df
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -100,7 +125,8 @@ def detect_volume_spike(df):
         return False
     avg_vol = df['volume'].iloc[-11:-1].mean()
     last_vol = df['volume'].iloc[-1]
-    if last_vol > 1.5 * avg_vol:
+    threshold_factor = 1.5  # You can make this dynamic based on market conditions
+    if last_vol > threshold_factor * avg_vol:
         return True
     return False
 
@@ -169,14 +195,18 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     sl = price * (1 - 0.002) if direction == "Bullish" else price * (1 + 0.002)
     tp = price * (1 + 0.004) if direction == "Bullish" else price * (1 - 0.004)
     count = len(indicators)
-    if count >= 5:
+
+    # Assign weights to indicators
+    weights = {"RSI": 1, "MACD": 1.5, "EMA": 1, "ADX": 0.5, "Volume": 0.5}
+    weighted_count = sum(weights.get(ind, 1) for ind in indicators)
+
+    if weighted_count >= 5:
         confidence = "Strong"
-    elif count == 4:
+    elif weighted_count == 4:
         confidence = "Medium"
     else:
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
-
 
 def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
     if not divergence:
@@ -251,14 +281,14 @@ for label, symbol in symbols.items():
         # st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if candle_age and int(candle_age) > 2 else 'OK'}")
 
         # Skip old signals
-        if candle_age != "" and int(candle_age) > 2:
-            direction = ""
-            ai_suggestion = ""
-        else:
-            pattern = detect_candle_pattern(df)
-            candle_pattern = pattern if pattern else "—"
-            indicators = []
-            if direction:
+       if candle_age != "" and int(candle_age) > 2:
+    direction = ""
+    ai_suggestion = ""
+else:
+    # Further condition to limit to recent signals
+    if candle_age != "" and int(candle_age) > 1:
+        direction = ""
+        ai_suggestion = ""
                 indicators.append("RSI")
                 if direction == "Bullish" and df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
                     indicators.append("MACD")
