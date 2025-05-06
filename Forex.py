@@ -144,17 +144,27 @@ def detect_candle_pattern(df):
     upper_wick = h - max(o, c)
     lower_wick = min(o, c) - l
 
+    print(f"Open: {o}, Close: {c}, High: {h}, Low: {l}")  # Debug print
+    print(f"Body: {body}, Range: {range_}, Upper Wick: {upper_wick}, Lower Wick: {lower_wick}")  # Debug print
+
     # Check for specific candle patterns using previous closed candle data
     if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
+        print("Pattern: Doji")  # Debug print
         return "Doji"
     if o < c and c > o:  # Bullish Engulfing check
+        print("Pattern: Bullish Engulfing")  # Debug print
         return "Bullish Engulfing"
     if o > c and c < o:  # Bearish Engulfing check
+        print("Pattern: Bearish Engulfing")  # Debug print
         return "Bearish Engulfing"
     if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:  # Hammer pattern
+        print("Pattern: Hammer")  # Debug print
         return "Hammer"
     if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:  # Shooting Star pattern
+        print("Pattern: Shooting Star")  # Debug print
         return "Shooting Star"
+    
+    print("Pattern: No Pattern Detected")  # Debug print
     return "No Pattern"  # Default when no pattern is identified
 
 def detect_trend_reversal(df):
