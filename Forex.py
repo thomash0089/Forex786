@@ -100,8 +100,9 @@ def detect_volume_spike(df):
         return False
     avg_vol = df['volume'].iloc[-11:-1].mean()
     last_vol = df['volume'].iloc[-1]
-    return last_vol > 1.5 * avg_vol
-
+    if last_vol > 1.5 * avg_vol:
+        return True
+    return False
 
 def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
