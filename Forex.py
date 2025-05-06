@@ -97,10 +97,12 @@ def calculate_atr(df, period=14):
 
 def detect_volume_spike(df):
     if 'volume' not in df.columns or len(df) < 11:
+        print("Volume data missing or not enough data points")
         return False
     avg_vol = df['volume'].iloc[-11:-1].mean()
     last_vol = df['volume'].iloc[-1]
-    if last_vol > 1.5 * avg_vol:
+    print(f"Last Volume: {last_vol} | Average Volume: {avg_vol}")  # Debug print
+    if last_vol > 2 * avg_vol:  # Increased threshold to 2x average volume
         return True
     return False
 
