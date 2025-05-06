@@ -138,7 +138,7 @@ def detect_candle_pattern(df):
         return "Shooting Star"
     return "No Pattern"  # Default when no pattern is identified
 
-# Removed "Candle Age" from the rows and table display logic.
+# Removed Candle Age logic
 rows = []
 for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
