@@ -236,13 +236,6 @@ for label, symbol in symbols.items():
 
         tf_status = get_tf_confirmation(symbol)
 
-# Modify Candle Age logic for recent divergence
-candle_age = "—"  # Default when no valid divergence direction
-if direction == "Bullish" and len(lows) >= 2:
-    candle_age = len(df) - lows[-1]  # Calculate age for the most recent bullish divergence
-elif direction == "Bearish" and len(highs) >= 2:
-    candle_age = len(df) - highs[-1]  # Calculate age for the most recent bearish divergence
-
 # Rows collection and display logic
 rows = []
 for label, symbol in symbols.items():
@@ -251,14 +244,14 @@ for label, symbol in symbols.items():
         # Calculate technical indicators like RSI, MACD, EMA, ADX, ATR...
 
         # Divergence detection and trend analysis here...
-        
-        # Get Candle Age
+
+        # Calculate the most recent Candle Age based on divergence
         candle_age = "—"  # Default when no valid divergence direction
         if direction == "Bullish" and len(lows) >= 2:
             candle_age = len(df) - lows[-1]  # Calculate age for the most recent bullish divergence
         elif direction == "Bearish" and len(highs) >= 2:
             candle_age = len(df) - highs[-1]  # Calculate age for the most recent bearish divergence
-        
+
         # Display the results in the table
         rows.append({
             "Pair": label,
@@ -278,6 +271,7 @@ for label, symbol in symbols.items():
             "Advice": advice if advice else "—",
             "News Alert": check_news_alert(label)
         })
+
 
 
 # ---------------- Table Display ---------------- #
