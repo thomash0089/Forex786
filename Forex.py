@@ -1,8 +1,8 @@
-# --- Page Setup (this must be the very first command) ---
+# First line: Streamlit page configuration (No imports above it)
 import streamlit as st
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
 
-# --- Now we import other libraries after setting page config ---
+# Now import other libraries after Streamlit page configuration
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 import requests
