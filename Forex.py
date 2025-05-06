@@ -247,16 +247,22 @@ for label, symbol in symbols.items():
         atr_value = df['ATR'].iloc[-1]
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
 
-        direction = detect_divergence_direction(df)
-        reversal = detect_trend_reversal(df)
-        volume_spike = detect_volume_spike(df)
+        # Get the direction, reversal, and volume spike
+direction = detect_divergence_direction(df)
+reversal = detect_trend_reversal(df)
+volume_spike = detect_volume_spike(df)
 
-        if direction == "Bullish" and "Forming" in reversal:
-            direction = ""
-        if direction == "Bearish" and "Forming" in reversal:
-            direction = ""
+# Check if direction is "Bullish" and reversal is forming
+if direction == "Bullish" and "Forming" in reversal:
+    direction = ""  # Clear direction if reversal is still forming
 
-        tf_status = get_tf_confirmation(symbol)
+# Check if direction is "Bearish" and reversal is forming
+if direction == "Bearish" and "Forming" in reversal:
+    direction = ""  # Clear direction if reversal is still forming
+
+# Check the timeframe confirmation (if needed)
+tf_status = get_tf_confirmation(symbol)
+
 
         # Candle age logic
         lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
