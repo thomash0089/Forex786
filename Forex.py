@@ -1,3 +1,6 @@
+# Set Streamlit page config first
+st.set_page_config(page_title="Forex AI Signals", layout="wide")
+
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -6,9 +9,6 @@ import numpy as np
 from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
 from pytz import timezone
-
-# Set Streamlit page config first
-st.set_page_config(page_title="Forex AI Signals", layout="wide")
 
 # Add caching decorator to the function
 @st.cache
