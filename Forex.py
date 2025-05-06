@@ -333,4 +333,25 @@ def trend_color_text(trend):
     return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
 
 df_result = pd.DataFrame(rows)
-df_sorted =
+df_sorted = df_result.sort_values(by="Pair", na_position='last') if "Pair" in df_result.columns else df_result
+
+for _, row in df_sorted.iterrows():
+    style = style_row(row)
+    styled_html += f"<tr style='{style}'>"
+    for col in column_order:
+        val = row[col]
+        if col == "Pair":
+            val = f"<strong style='font-size: 18px;'>{val}</strong>"
+        elif col == "Trend":
+            val = trend_color_text(val)
+        styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
+    styled_html += "</tr>"
+
+styled_html += "</table>"
+st.markdown(styled_html, unsafe_allow_html=True)
+
+# Footer
+st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.text(f"Scanned Pairs: {len(rows)}")
+strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
+st.text(f"Strong Signals Found: {len(strongs)}")
