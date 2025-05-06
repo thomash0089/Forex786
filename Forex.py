@@ -32,6 +32,7 @@ news_events = {
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}]
 }
 
+
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -117,24 +118,25 @@ def detect_divergence_direction(df):
 
 
 def detect_candle_pattern(df):
+    # Last closed candle (second to last row)
     o, c, h, l = df['open'].iloc[-2], df['close'].iloc[-2], df['high'].iloc[-2], df['low'].iloc[-2]
     body = abs(c - o)
     range_ = h - l
     upper_wick = h - max(o, c)
     lower_wick = min(o, c) - l
 
+    # Check for specific candle patterns using previous closed candle data
     if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
         return "Doji"
-    if o < c and c > o:
+    if o < c and c > o:  # Bullish Engulfing check
         return "Bullish Engulfing"
-    if o > c and c < o:
+    if o > c and c < o:  # Bearish Engulfing check
         return "Bearish Engulfing"
-    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
+    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:  # Hammer pattern
         return "Hammer"
-    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
+    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:  # Shooting Star pattern
         return "Shooting Star"
-    return "No Pattern"
-
+    return "No Pattern"  # Default when no pattern is identified
 
 def detect_trend_reversal(df):
     if len(df) < 3:
@@ -150,7 +152,6 @@ def detect_trend_reversal(df):
     elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
         return "Reversal Forming Bearish"
     return ""
-
 
 def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
@@ -235,8 +236,23 @@ for label, symbol in symbols.items():
 
         tf_status = get_tf_confirmation(symbol)
 
+        # Candle age logic
+        lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
+        highs = argrelextrema(df['close'].values, np.greater_equal, order=3)[0]
+        candle_age = ""
+        if direction == "Bullish" and len(lows) >= 2:
+            candle_age = len(df) - lows[-1]
+        elif direction == "Bearish" and len(highs) >= 2:
+            candle_age = len(df) - highs[-1]
+        else:
+            candle_age = ""
+
+        # Debug
+        # st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if candle_age and int(candle_age) > 2 else 'OK'}")
+
         # Skip old signals
-        if direction == "":
+        if candle_age != "" and int(candle_age) > 2:
+            direction = ""
             ai_suggestion = ""
         else:
             pattern = detect_candle_pattern(df)
@@ -282,22 +298,74 @@ for label, symbol in symbols.items():
                 "Confirmed Indicators": ", ".join(indicators),
                 "Candle Pattern": candle_pattern,
                 "Volume Spike": "Yes" if volume_spike else "No",
+                "Candle Age": f"{candle_age} candles ago" if candle_age and direction else "—",
                 "AI Suggestion": ai_suggestion, "Advice": advice,
                 "News Alert": check_news_alert(label)
             })
 # ---------------- Table Display ---------------- #
 column_order = [
     "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
-    "Confirmed Indicators", "Candle Pattern", "Volume Spike", "AI Suggestion", "Advice", "News Alert"
+    "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Candle Age",
+    "AI Suggestion", "Advice", "News Alert"
 ]
 
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-styled_html += "<tr>" + "".join([ 
+styled_html += "<tr>" + "".join([
     f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
     for col in column_order
 ]) + "</tr>"
 
-# Add styles and rows here for display...
+
+def style_row(row):
+    ai = row['AI Suggestion']
+    tf = row['TF']
+    trend = row['Trend']
+    div = row['Divergence']
+    age = row['Candle Age']
+    try:
+        age_minutes = int(age.split()[0])
+    except:
+        age_minutes = 99
+
+    # ✅ Highlight fresh signals
+    if age_minutes <= 30:
+        if (
+                pd.notna(ai) and "Confidence: Strong" in ai and trend == div
+                and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
+        ):
+            return 'background-color: #add8e6;'  # Light Blue
+        if (
+                pd.notna(ai) and "Confidence: Medium" in ai and trend == div
+                and ((div == "Bullish" and "Confirm Bullish" in tf) or (div == "Bearish" and "Confirm Bearish" in tf))
+        ):
+            return 'background-color: #ccffcc;'  # Light Green
+    if "Reversal" in row['Reversal Signal']:
+        return 'background-color: #fff0b3;'  # Yellow
+    return ''
+
+
+def trend_color_text(trend):
+    color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "gray"
+    return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
+
+
+df_result = pd.DataFrame(rows)
+df_sorted = df_result.sort_values(by="Pair", na_position='last') if "Pair" in df_result.columns else df_result
+
+for _, row in df_sorted.iterrows():
+    style = style_row(row)
+    styled_html += f"<tr style='{style}'>"
+    for col in column_order:
+        val = row[col]
+        if col == "Pair":
+            val = f"<strong style='font-size: 18px;'>{val}</strong>"
+        elif col == "Trend":
+            val = trend_color_text(val)
+        styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
+    styled_html += "</tr>"
+
+styled_html += "</table>"
+st.markdown(styled_html, unsafe_allow_html=True)
 
 # Footer
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
