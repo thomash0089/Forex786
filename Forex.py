@@ -108,12 +108,19 @@ def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
     df = df.dropna()
     c, r = df['close'], df['RSI']
-    lows = argrelextrema(c.values, np.less_equal, order=3)[0]
-    highs = argrelextrema(c.values, np.greater_equal, order=3)[0]
-    if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]]:
+    
+    # Increase order for more significant peaks/troughs
+    lows = argrelextrema(c.values, np.less_equal, order=5)[0]  # Increased order from 3 to 5
+    highs = argrelextrema(c.values, np.greater_equal, order=5)[0]  # Increased order from 3 to 5
+    
+    # Bullish Divergence (RSI higher on a lower price low)
+    if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]] and r.iloc[lows[-1]] < 30:
         return "Bullish"
-    if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
+    
+    # Bearish Divergence (RSI lower on a higher price high)
+    if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]] and r.iloc[highs[-1]] > 70:
         return "Bearish"
+    
     return ""
 
 
