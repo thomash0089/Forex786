@@ -29,6 +29,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Indicator Functions ---
+@st.cache_data
 def fetch_data(symbol, interval="5min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -226,9 +227,9 @@ def trend_color_text(trend):
 column_order = ["Pair", "Price", "RSI", "Trend", "Divergence", "TF", "Confirmed Indicators", "AI Suggestion", "Advice"]
 
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-styled_html += "<tr>" + "".join([
-    f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
-    for col in column_order
+styled_html += "<tr>" + "".join([ 
+    f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>" 
+    for col in column_order 
 ]) + "</tr>"
 
 for _, row in df_final.iterrows():
