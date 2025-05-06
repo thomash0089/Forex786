@@ -115,6 +115,17 @@ def detect_divergence_direction(df):
     lows = argrelextrema(c.values, np.less_equal, order=5)[0]  # Increased order from 3 to 5
     highs = argrelextrema(c.values, np.greater_equal, order=5)[0]  # Increased order from 3 to 5
     
+    # Candle Age Logic
+    candle_age = ""
+    if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]]:
+        candle_age = len(df) - lows[-1]
+    elif len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
+        candle_age = len(df) - highs[-1]
+
+    # Skip if candle is older than 2 candles
+    if candle_age != "" and int(candle_age) > 2:
+        return ""  # Skip if the candle is too old
+    
     # Bullish Divergence (RSI higher on a lower price low)
     if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]] and r.iloc[lows[-1]] < 30:
         return "Bullish"
@@ -124,7 +135,6 @@ def detect_divergence_direction(df):
         return "Bearish"
     
     return ""
-
 
 def detect_candle_pattern(df):
     # Last closed candle (second to last row)
