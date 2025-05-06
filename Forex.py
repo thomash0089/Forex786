@@ -1,3 +1,4 @@
+# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name + Safe Filters) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -7,10 +8,9 @@ from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
 from pytz import timezone
 
-# Move this line to the top
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
-
-st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>",
+            unsafe_allow_html=True)
 st_autorefresh(interval=120000, key="auto_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
@@ -32,6 +32,7 @@ news_events = {
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}]
 }
 
+
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -45,6 +46,7 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     df = df.astype(float).sort_index()
     return df
 
+
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = delta.where(delta > 0, 0)
@@ -54,6 +56,7 @@ def calculate_rsi(series, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+
 def calculate_macd(series):
     ema12 = series.ewm(span=12, adjust=False).mean()
     ema26 = series.ewm(span=26, adjust=False).mean()
@@ -61,8 +64,10 @@ def calculate_macd(series):
     signal = macd.ewm(span=9, adjust=False).mean()
     return macd, signal
 
+
 def calculate_ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
+
 
 def calculate_adx(df, period=14):
     df['TR'] = np.maximum(df['high'] - df['low'],
@@ -80,6 +85,7 @@ def calculate_adx(df, period=14):
     adx = dx.rolling(window=period).mean()
     return adx
 
+
 def calculate_atr(df, period=14):
     tr1 = df['high'] - df['low']
     tr2 = abs(df['high'] - df['close'].shift())
@@ -88,42 +94,38 @@ def calculate_atr(df, period=14):
     atr = tr.rolling(window=period).mean()
     return atr
 
+
 def detect_volume_spike(df):
     if 'volume' not in df.columns or len(df) < 11:
         return False
     avg_vol = df['volume'].iloc[-11:-1].mean()
     last_vol = df['volume'].iloc[-1]
-    return last_vol > 1.5 * avg_vol
+    if last_vol > 1.5 * avg_vol:
+        return True
+    return False
 
 def detect_divergence_direction(df):
-    if df.empty:
-        return ""  # Check if DataFrame is empty
     df['RSI'] = calculate_rsi(df['close'])
-    df = df.dropna()  # Drop any NaN values to prevent errors
+    df = df.dropna()
     c, r = df['close'], df['RSI']
-    
     lows = argrelextrema(c.values, np.less_equal, order=3)[0]
     highs = argrelextrema(c.values, np.greater_equal, order=3)[0]
-    
-    if len(lows) < 2 or len(highs) < 2:
-        return ""  # Not enough data to detect divergence
-    
-    if c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]]:
+    if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]]:
         return "Bullish"
-    if c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
+    if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
         return "Bearish"
-    
     return ""
 
+
 def detect_candle_pattern(df):
-    if len(df) < 2:  # Ensure there are at least two candles
-        return "No Pattern"  # Return default if not enough candles
+    # Last closed candle (second to last row)
     o, c, h, l = df['open'].iloc[-2], df['close'].iloc[-2], df['high'].iloc[-2], df['low'].iloc[-2]
     body = abs(c - o)
     range_ = h - l
     upper_wick = h - max(o, c)
     lower_wick = min(o, c) - l
 
+    # Check for specific candle patterns using previous closed candle data
     if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
         return "Doji"
     if o < c and c > o:  # Bullish Engulfing check
@@ -160,6 +162,7 @@ def get_tf_confirmation(symbol):
                 return f"Confirm {dir}"
     return ""
 
+
 def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     if not direction:
         return ""
@@ -173,6 +176,7 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
     else:
         return ""
     return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
+
 
 def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
     if not divergence:
@@ -190,6 +194,7 @@ def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
             return f"LOW: {trend.lower()} — trend match but weak"
     return "INFO: Analysis unclear"
 
+
 def check_news_alert(pair):
     now = datetime.now(timezone('Asia/Karachi'))
     alert_list = []
@@ -202,6 +207,7 @@ def check_news_alert(pair):
         except:
             continue
     return " | ".join(alert_list) if alert_list else ""
+
 
 rows = []
 for label, symbol in symbols.items():
@@ -241,6 +247,10 @@ for label, symbol in symbols.items():
         else:
             candle_age = ""
 
+        # Debug
+        # st.text(f"{label} | AGE: {candle_age} | Direction: {direction} → {'SKIPPED' if candle_age and int(candle_age) > 2 else 'OK'}")
+
+        # Skip old signals
         if candle_age != "" and int(candle_age) > 2:
             direction = ""
             ai_suggestion = ""
@@ -300,8 +310,11 @@ column_order = [
 ]
 
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-styled_html += "<tr>" + "".join([f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
-    for col in column_order]) + "</tr>"
+styled_html += "<tr>" + "".join([
+    f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
+    for col in column_order
+]) + "</tr>"
+
 
 def style_row(row):
     ai = row['AI Suggestion']
@@ -314,6 +327,7 @@ def style_row(row):
     except:
         age_minutes = 99
 
+    # ✅ Highlight fresh signals
     if age_minutes <= 30:
         if (
                 pd.notna(ai) and "Confidence: Strong" in ai and trend == div
@@ -329,9 +343,11 @@ def style_row(row):
         return 'background-color: #fff0b3;'  # Yellow
     return ''
 
+
 def trend_color_text(trend):
     color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "gray"
     return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
+
 
 df_result = pd.DataFrame(rows)
 df_sorted = df_result.sort_values(by="Pair", na_position='last') if "Pair" in df_result.columns else df_result
