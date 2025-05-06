@@ -1,4 +1,4 @@
-# --- Page Setup (this must be the very first command) ---
+# --- Page Setup (must be first command) ---
 import streamlit as st
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
 
