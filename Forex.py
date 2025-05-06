@@ -236,27 +236,27 @@ for label, symbol in symbols.items():
 
         tf_status = get_tf_confirmation(symbol)
 
-       # Updated Candle age logic
-lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
-highs = argrelextrema(df['close'].values, np.greater_equal, order=3)[0]
-candle_age = ""
-if direction == "Bullish" and len(lows) >= 2:
-    candle_age = len(df) - lows[-1]  # Calculate age for bullish divergence
-elif direction == "Bearish" and len(highs) >= 2:
-    candle_age = len(df) - highs[-1]  # Calculate age for bearish divergence
-else:
-    candle_age = "—"  # Default when no valid divergence direction
+      # Updated Candle age logic
+        lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
+        highs = argrelextrema(df['close'].values, np.greater_equal, order=3)[0]
+            candle_age = ""
+        if direction == "Bullish" and len(lows) >= 2:
+            candle_age = len(df) - lows[-1]  # Calculate age for bullish divergence
+        elif direction == "Bearish" and len(highs) >= 2:
+            candle_age = len(df) - highs[-1]  # Calculate age for bearish divergence
+        else:
+            candle_age = "—"  # Default when no valid divergence direction
 
 # Skip old signals
-if candle_age != "—" and int(candle_age) > 2:
-    direction = ""
-    ai_suggestion = ""
-else:
-    pattern = detect_candle_pattern(df)
-    candle_pattern = pattern if pattern else "—"
-    indicators = []
-    if direction:
-        indicators.append("RSI")
+        if candle_age != "—" and int(candle_age) > 2:
+            direction = ""
+            ai_suggestion = ""
+         else:
+            pattern = detect_candle_pattern(df)
+            candle_pattern = pattern if pattern else "—"
+             indicators = []
+        if direction:
+            indicators.append("RSI")
         if direction == "Bullish" and df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
             indicators.append("MACD")
         if direction == "Bearish" and df['MACD'].iloc[-1] < df['MACD_Signal'].iloc[-1]:
@@ -300,6 +300,7 @@ else:
         "AI Suggestion": ai_suggestion, "Advice": advice,
         "News Alert": check_news_alert(label)
     })
+
 
 # ---------------- Table Display ---------------- #
 column_order = [
