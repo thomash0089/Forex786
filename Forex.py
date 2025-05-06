@@ -1,4 +1,3 @@
-# --- Signals with H & I (15-Min Timeframe | Cleaned Table) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -7,7 +6,10 @@ import numpy as np
 from datetime import datetime, timedelta, timezone
 from scipy.signal import argrelextrema
 
+# This must be the first Streamlit command
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
+
+# Now you can proceed with the rest of your code
 st_autorefresh(interval=120000, key="auto_refresh")  # 2 min
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
