@@ -137,7 +137,6 @@ def detect_divergence_direction(df):
     return ""
 
 def detect_candle_pattern(df):
-    # Last closed candle (second to last row)
     o, c, h, l = df['open'].iloc[-2], df['close'].iloc[-2], df['high'].iloc[-2], df['low'].iloc[-2]
     body = abs(c - o)
     range_ = h - l
