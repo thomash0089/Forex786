@@ -144,43 +144,37 @@ def detect_candle_pattern(df):
     upper_wick = h - max(o, c)
     lower_wick = min(o, c) - l
 
-    print(f"Open: {o}, Close: {c}, High: {h}, Low: {l}")  # Debug print
-    print(f"Body: {body}, Range: {range_}, Upper Wick: {upper_wick}, Lower Wick: {lower_wick}")  # Debug print
+    # Debug: Show candle values
+    print(f"Open: {o}, Close: {c}, High: {h}, Low: {l}")
+    print(f"Body: {body}, Range: {range_}, Upper Wick: {upper_wick}, Lower Wick: {lower_wick}")
 
-    # Check for specific candle patterns using previous closed candle data
-    if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
-        print("Pattern: Doji")  # Debug print
-        return "Doji"
+    # Bullish Engulfing: Current candle closes higher than open, previous candle is red (close < open)
     if o < c and c > o:  # Bullish Engulfing check
-        print("Pattern: Bullish Engulfing")  # Debug print
+        print("Pattern: Bullish Engulfing")
         return "Bullish Engulfing"
+
+    # Bearish Engulfing: Current candle closes lower than open, previous candle is green (close > open)
     if o > c and c < o:  # Bearish Engulfing check
-        print("Pattern: Bearish Engulfing")  # Debug print
+        print("Pattern: Bearish Engulfing")
         return "Bearish Engulfing"
-    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:  # Hammer pattern
-        print("Pattern: Hammer")  # Debug print
+    
+    # Doji: Small body with wicks of similar size
+    if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
+        print("Pattern: Doji")
+        return "Doji"
+    
+    # Hammer: Small body at the top, long lower wick
+    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
+        print("Pattern: Hammer")
         return "Hammer"
-    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:  # Shooting Star pattern
-        print("Pattern: Shooting Star")  # Debug print
+    
+    # Shooting Star: Small body at the bottom, long upper wick
+    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
+        print("Pattern: Shooting Star")
         return "Shooting Star"
     
-    print("Pattern: No Pattern Detected")  # Debug print
-    return "No Pattern"  # Default when no pattern is identified
-
-def detect_trend_reversal(df):
-    if len(df) < 3:
-        return ""
-    e9 = df['EMA9'].iloc[-3:]
-    e20 = df['EMA20'].iloc[-3:]
-    if e9[0] < e20[0] and e9[1] > e20[1] and e9[2] > e20[2]:
-        return "Reversal Confirmed Bullish"
-    elif e9[0] > e20[0] and e9[1] < e20[1] and e9[2] < e20[2]:
-        return "Reversal Confirmed Bearish"
-    elif e9[-2] < e20[-2] and e9[-1] > e20[-1]:
-        return "Reversal Forming Bullish"
-    elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
-        return "Reversal Forming Bearish"
-    return ""
+    print("Pattern: No Pattern Detected")  # Debug print if no pattern detected
+    return "No Pattern"
 
 def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
