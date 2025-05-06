@@ -97,12 +97,10 @@ def calculate_atr(df, period=14):
 
 def detect_volume_spike(df):
     if 'volume' not in df.columns or len(df) < 11:
-        print("Volume data missing or not enough data points")
         return False
     avg_vol = df['volume'].iloc[-11:-1].mean()
     last_vol = df['volume'].iloc[-1]
-    print(f"Last Volume: {last_vol} | Average Volume: {avg_vol}")  # Debug print
-    if last_vol > 2 * avg_vol:  # Increased threshold to 2x average volume
+    if last_vol > 1.5 * avg_vol:
         return True
     return False
 
@@ -110,70 +108,50 @@ def detect_divergence_direction(df):
     df['RSI'] = calculate_rsi(df['close'])
     df = df.dropna()
     c, r = df['close'], df['RSI']
-    
-    # Increase order for more significant peaks/troughs
-    lows = argrelextrema(c.values, np.less_equal, order=5)[0]  # Increased order from 3 to 5
-    highs = argrelextrema(c.values, np.greater_equal, order=5)[0]  # Increased order from 3 to 5
-    
-    # Candle Age Logic
-    candle_age = ""
+    lows = argrelextrema(c.values, np.less_equal, order=3)[0]
+    highs = argrelextrema(c.values, np.greater_equal, order=3)[0]
     if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]]:
-        candle_age = len(df) - lows[-1]
-    elif len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
-        candle_age = len(df) - highs[-1]
-
-    # Skip if candle is older than 2 candles
-    if candle_age != "" and int(candle_age) > 2:
-        return ""  # Skip if the candle is too old
-    
-    # Bullish Divergence (RSI higher on a lower price low)
-    if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]] and r.iloc[lows[-1]] < 30:
         return "Bullish"
-    
-    # Bearish Divergence (RSI lower on a higher price high)
-    if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]] and r.iloc[highs[-1]] > 70:
+    if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
         return "Bearish"
-    
     return ""
 
+
 def detect_candle_pattern(df):
+    # Last closed candle (second to last row)
     o, c, h, l = df['open'].iloc[-2], df['close'].iloc[-2], df['high'].iloc[-2], df['low'].iloc[-2]
     body = abs(c - o)
     range_ = h - l
     upper_wick = h - max(o, c)
     lower_wick = min(o, c) - l
 
-    # Debug: Show candle values
-    print(f"Open: {o}, Close: {c}, High: {h}, Low: {l}")
-    print(f"Body: {body}, Range: {range_}, Upper Wick: {upper_wick}, Lower Wick: {lower_wick}")
-
-    # Bullish Engulfing: Current candle closes higher than open, previous candle is red (close < open)
-    if o < c and c > o:  # Bullish Engulfing check
-        print("Pattern: Bullish Engulfing")
-        return "Bullish Engulfing"
-
-    # Bearish Engulfing: Current candle closes lower than open, previous candle is green (close > open)
-    if o > c and c < o:  # Bearish Engulfing check
-        print("Pattern: Bearish Engulfing")
-        return "Bearish Engulfing"
-    
-    # Doji: Small body with wicks of similar size
+    # Check for specific candle patterns using previous closed candle data
     if range_ > 0 and body < range_ * 0.1 and upper_wick > range_ * 0.3 and lower_wick > range_ * 0.3:
-        print("Pattern: Doji")
         return "Doji"
-    
-    # Hammer: Small body at the top, long lower wick
-    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:
-        print("Pattern: Hammer")
+    if o < c and c > o:  # Bullish Engulfing check
+        return "Bullish Engulfing"
+    if o > c and c < o:  # Bearish Engulfing check
+        return "Bearish Engulfing"
+    if body < range_ * 0.3 and lower_wick > body * 2 and upper_wick < body:  # Hammer pattern
         return "Hammer"
-    
-    # Shooting Star: Small body at the bottom, long upper wick
-    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:
-        print("Pattern: Shooting Star")
+    if body < range_ * 0.3 and upper_wick > body * 2 and lower_wick < body:  # Shooting Star pattern
         return "Shooting Star"
-    
-    print("Pattern: No Pattern Detected")  # Debug print if no pattern detected
-    return "No Pattern"
+    return "No Pattern"  # Default when no pattern is identified
+
+def detect_trend_reversal(df):
+    if len(df) < 3:
+        return ""
+    e9 = df['EMA9'].iloc[-3:]
+    e20 = df['EMA20'].iloc[-3:]
+    if e9[0] < e20[0] and e9[1] > e20[1] and e9[2] > e20[2]:
+        return "Reversal Confirmed Bullish"
+    elif e9[0] > e20[0] and e9[1] < e20[1] and e9[2] < e20[2]:
+        return "Reversal Confirmed Bearish"
+    elif e9[-2] < e20[-2] and e9[-1] > e20[-1]:
+        return "Reversal Forming Bullish"
+    elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
+        return "Reversal Forming Bearish"
+    return ""
 
 def get_tf_confirmation(symbol):
     for tf in ["5min", "15min", "1h"]:
@@ -247,22 +225,16 @@ for label, symbol in symbols.items():
         atr_value = df['ATR'].iloc[-1]
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
 
-        # Get the direction, reversal, and volume spike
-direction = detect_divergence_direction(df)
-reversal = detect_trend_reversal(df)
-volume_spike = detect_volume_spike(df)
+        direction = detect_divergence_direction(df)
+        reversal = detect_trend_reversal(df)
+        volume_spike = detect_volume_spike(df)
 
-# Check if direction is "Bullish" and reversal is forming
-if direction == "Bullish" and "Forming" in reversal:
-    direction = ""  # Clear direction if reversal is still forming
+        if direction == "Bullish" and "Forming" in reversal:
+            direction = ""
+        if direction == "Bearish" and "Forming" in reversal:
+            direction = ""
 
-# Check if direction is "Bearish" and reversal is forming
-if direction == "Bearish" and "Forming" in reversal:
-    direction = ""  # Clear direction if reversal is still forming
-
-# Check the timeframe confirmation (if needed)
-tf_status = get_tf_confirmation(symbol)
-
+        tf_status = get_tf_confirmation(symbol)
 
         # Candle age logic
         lows = argrelextrema(df['close'].values, np.less_equal, order=3)[0]
