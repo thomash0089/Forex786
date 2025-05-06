@@ -7,12 +7,14 @@ from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
 from pytz import timezone
 
-# Make sure st.set_page_config is the first Streamlit command
+# Ensure this is the very first Streamlit command
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
+
+# Refresh the page every 2 minutes
+st_autorefresh(interval=120000, key="auto_refresh")
 
 # Streamlit app heading
 st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>", unsafe_allow_html=True)
-st_autorefresh(interval=120000, key="auto_refresh")
 
 # API key for fetching data from TwelveData
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
@@ -25,7 +27,7 @@ symbols = {
 }
 
 # Function to fetch data from TwelveData API
-@st.cache
+@st.cache_data
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -47,6 +49,18 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     except Exception as e:
         st.error(f"Error fetching data for {symbol}: {str(e)}")
         return None
+
+# Function to calculate RSI for the given dataframe
+def calculate_rsi(df, period=14):
+    delta = df['close'].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    df['RSI'] = rsi
+    return df
 
 # Function to detect divergence direction (Bullish/Bearish)
 def detect_divergence_direction(df):
@@ -76,18 +90,6 @@ def detect_volume_spike(df):
     if volume > 2 * avg_volume:  # Example of volume spike detection
         return "Volume Spike"
     return "Normal Volume"
-
-# Function to calculate RSI for the given dataframe
-def calculate_rsi(df, period=14):
-    delta = df['close'].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
-    avg_gain = gain.rolling(window=period).mean()
-    avg_loss = loss.rolling(window=period).mean()
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    df['RSI'] = rsi
-    return df
 
 # Main function to display data and analysis
 def display_signals():
