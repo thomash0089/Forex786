@@ -18,7 +18,9 @@ symbols = {
     "EUR/USD": "EUR/USD", "GBP/USD": "GBP/USD", "USD/JPY": "USD/JPY",
     "AUD/USD": "AUD/USD", "USD/CAD": "USD/CAD", "USD/CHF": "USD/CHF",
     "XAU/USD": "XAU/USD", "WTI/USD": "WTI/USD", "EUR/JPY": "EUR/JPY", "NZD/USD": "NZD/USD",
-    "EUR/GBP": "EUR/GBP", "EUR/CAD": "EUR/CAD"  # ✅ New pairs added
+    "EUR/GBP": "EUR/GBP", "EUR/CAD": "EUR/CAD",  # previously added
+    "GBP/JPY": "GBP/JPY", "EUR/AUD": "EUR/AUD", "AUD/JPY": "AUD/JPY",
+    "GBP/NZD": "GBP/NZD", "EUR/NZD": "EUR/NZD"   # ✅ New additions
 }
 news_events = {
     "EUR/USD": [{"time": "10:30", "title": "Euro CPI Data"}],
@@ -31,10 +33,14 @@ news_events = {
     "WTI/USD": [{"time": "12:30", "title": "Crude Oil Inventory"}],
     "EUR/JPY": [{"time": "09:00", "title": "ECB Bulletin"}],
     "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
-    "EUR/GBP": [{"time": "10:00", "title": "UK & Euro Economic Sentiment"}],  # ✅
-    "EUR/CAD": [{"time": "14:30", "title": "ECB & BoC Press Conference"}]     # ✅
+    "EUR/GBP": [{"time": "10:00", "title": "UK & Euro Economic Sentiment"}],
+    "EUR/CAD": [{"time": "14:30", "title": "ECB & BoC Press Conference"}],
+    "GBP/JPY": [{"time": "11:30", "title": "UK Inflation & JPY Trade Balance"}],
+    "EUR/AUD": [{"time": "09:45", "title": "Eurozone GDP vs Australia CPI"}],
+    "AUD/JPY": [{"time": "08:15", "title": "RBA vs BOJ Rate Outlook"}],
+    "GBP/NZD": [{"time": "07:50", "title": "BoE vs RBNZ Rate Forecast"}],
+    "EUR/NZD": [{"time": "10:20", "title": "Euro Retail vs NZ Growth Data"}]
 }
-
 
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
