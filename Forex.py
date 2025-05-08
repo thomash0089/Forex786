@@ -262,11 +262,16 @@ def trend_color_text(trend):
     return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
 
 
+def confidence_score(text):
+    if pd.isna(text): return 0
+    if "Confidence: Strong" in text: return 3
+    if "Confidence: Medium" in text: return 2
+    if "Confidence: Low" in text: return 1
+    return 0
+
 df_result = pd.DataFrame(rows)
-if "Pair" in df_result.columns:
-    df_sorted = df_result.sort_values(by="Pair", na_position='last')
-else:
-    df_sorted = df_result
+df_result["Score"] = df_result["AI Suggestion"].apply(confidence_score)
+df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
 
 for _, row in df_sorted.iterrows():
     style = style_row(row)
