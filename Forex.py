@@ -18,9 +18,10 @@ symbols = {
     "EUR/USD": "EUR/USD", "GBP/USD": "GBP/USD", "USD/JPY": "USD/JPY",
     "AUD/USD": "AUD/USD", "USD/CAD": "USD/CAD", "USD/CHF": "USD/CHF",
     "XAU/USD": "XAU/USD", "WTI/USD": "WTI/USD", "EUR/JPY": "EUR/JPY", "NZD/USD": "NZD/USD",
-    "EUR/GBP": "EUR/GBP", "EUR/CAD": "EUR/CAD",  # previously added
+    "EUR/GBP": "EUR/GBP", "EUR/CAD": "EUR/CAD",
     "GBP/JPY": "GBP/JPY", "EUR/AUD": "EUR/AUD", "AUD/JPY": "AUD/JPY",
-    "GBP/NZD": "GBP/NZD", "EUR/NZD": "EUR/NZD"   # ✅ New additions
+    "GBP/NZD": "GBP/NZD", "EUR/NZD": "EUR/NZD",  "XAG/USD": "XAG/USD",  # ✅ Silver added
+
 }
 news_events = {
     "EUR/USD": [{"time": "10:30", "title": "Euro CPI Data"}],
@@ -39,9 +40,9 @@ news_events = {
     "EUR/AUD": [{"time": "09:45", "title": "Eurozone GDP vs Australia CPI"}],
     "AUD/JPY": [{"time": "08:15", "title": "RBA vs BOJ Rate Outlook"}],
     "GBP/NZD": [{"time": "07:50", "title": "BoE vs RBNZ Rate Forecast"}],
-    "EUR/NZD": [{"time": "10:20", "title": "Euro Retail vs NZ Growth Data"}]
+    "EUR/NZD": [{"time": "10:20", "title": "Euro Retail vs NZ Growth Data"}],
+    "XAG/USD": [{"time": "13:45", "title": "Silver Market Update"}],
 }
-
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -104,14 +105,6 @@ def calculate_adx(df, period=14):
     return adx
 
 
-def detect_volume_spike(df):
-    if 'volume' not in df.columns or len(df) < 11:
-        return False
-    avg_vol = df['volume'].iloc[-11:-1].mean()
-    last_vol = df['volume'].iloc[-1]
-    return last_vol > 1.5 * avg_vol
-
-
 def detect_candle_pattern(df):
     o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
     current_open = o.iloc[-1]
@@ -140,19 +133,6 @@ def detect_candle_pattern(df):
     return ""
 
 
-def detect_divergence_direction(df):
-    df['RSI'] = calculate_rsi(df['close'])
-    df = df.dropna()
-    c, r = df['close'], df['RSI']
-    lows = argrelextrema(c.values, np.less_equal, order=3)[0]
-    highs = argrelextrema(c.values, np.greater_equal, order=3)[0]
-    if len(lows) >= 2 and c.iloc[lows[-1]] < c.iloc[lows[-2]] and r.iloc[lows[-1]] > r.iloc[lows[-2]]:
-        return "Bullish"
-    if len(highs) >= 2 and c.iloc[highs[-1]] > c.iloc[highs[-2]] and r.iloc[highs[-1]] < r.iloc[highs[-2]]:
-        return "Bearish"
-    return ""
-
-
 def detect_trend_reversal(df):
     if len(df) < 3:
         return ""
@@ -167,13 +147,11 @@ def detect_trend_reversal(df):
     elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
         return "Reversal Forming Bearish"
     return ""
-
-
-def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
-    if not direction:
+def generate_ai_suggestion(price, indicators, atr):
+    if not indicators:
         return ""
-    sl = price * (1 - 0.002) if direction == "Bullish" else price * (1 + 0.002)
-    tp = price * (1 + 0.004) if direction == "Bullish" else price * (1 - 0.004)
+    sl = price - (atr * 1.2) if "Bullish" in indicators else price + (atr * 1.2)
+    tp = price + (atr * 2.5) if "Bullish" in indicators else price - (atr * 2.5)
     count = len(indicators)
     if count >= 4:
         confidence = "Strong"
@@ -183,34 +161,7 @@ def generate_ai_suggestion(price, direction, indicators, tf_confirmed):
         confidence = "Low"
     else:
         return ""
-    return f"{confidence} {direction} @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
-
-
-def get_tf_confirmation(symbol):
-    for tf in ["5min", "15min", "1h"]:
-        df = fetch_data(symbol, interval=tf)
-        if df is not None:
-            dir = detect_divergence_direction(df)
-            if dir:
-                return f"Confirm {dir}"
-    return ""
-
-
-def generate_advice(trend, divergence, ai_suggestion, tf_confirm):
-    if not divergence:
-        return "No signal detected — wait"
-    if trend != divergence:
-        if "Strong" in ai_suggestion and "Confirm" in tf_confirm:
-            return f"WARNING: {divergence} signal forming, but trend is {trend} — early entry possible"
-        return f"NOTE: Divergence forming but trend still {trend.lower()} — wait for confirmation"
-    if trend == divergence:
-        if "Strong" in ai_suggestion:
-            return f"STRONG: {trend.lower()} setup — trend and signal match"
-        elif "Medium" in ai_suggestion:
-            return f"MEDIUM: {trend.lower()} — trend match"
-        else:
-            return f"LOW: {trend.lower()} — trend match but weak"
-    return "INFO: Analysis unclear"
+    return f"{confidence} Signal @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
 
 
 def check_news_alert(pair):
@@ -244,43 +195,24 @@ for label, symbol in symbols.items():
         atr_value = df['ATR'].iloc[-1]
         atr_status = "🔴 Low" if atr_value < 0.0004 else "🟡 Normal" if atr_value < 0.0009 else "🟢 High"
 
-        direction = detect_divergence_direction(df)
-        recent = df['RSI'].iloc[-2:]
-
-        if direction == "Bullish" and all(r < 50 for r in recent):
-            direction = ""
-        if direction == "Bearish" and all(r > 50 for r in recent):
-            direction = ""
-
-        tf_status = get_tf_confirmation(symbol)
         reversal = detect_trend_reversal(df)
-        volume_spike = detect_volume_spike(df)
-
-        signal_time = pd.to_datetime(df.index[-1])
-        now = datetime.now()
-        age_minutes = int((now - signal_time).total_seconds() / 60)
-        age_minutes = max(0, age_minutes)
-
         pattern = detect_candle_pattern(df)
         candle_pattern = pattern if pattern else "—"
 
         indicators = []
-        if direction:
-            indicators.append("RSI")
-            if direction == "Bullish" and df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
-                indicators.append("MACD")
-            if direction == "Bearish" and df['MACD'].iloc[-1] < df['MACD_Signal'].iloc[-1]:
-                indicators.append("MACD")
-            if direction == "Bullish" and price_now > df['EMA9'].iloc[-1] and price_now > df['EMA20'].iloc[-1]:
-                indicators.append("EMA")
-            if direction == "Bearish" and price_now < df['EMA9'].iloc[-1] and price_now < df['EMA20'].iloc[-1]:
-                indicators.append("EMA")
-            if df['ADX'].iloc[-1] > 20:
-                indicators.append("ADX")
-            if volume_spike:
-                indicators.append("Volume")
-            if direction in pattern:
-                indicators.append("Candle")
+        if df['RSI'].iloc[-1] > 50:
+            indicators.append("Bullish")
+        elif df['RSI'].iloc[-1] < 50:
+            indicators.append("Bearish")
+
+        if df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
+            indicators.append("MACD")
+        if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]:
+            indicators.append("EMA")
+        if df['ADX'].iloc[-1] > 20:
+            indicators.append("ADX")
+        if pattern:
+            indicators.append("Candle")
 
         trend = (
             "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]
@@ -288,26 +220,22 @@ for label, symbol in symbols.items():
             else "Sideways"
         )
 
-        ai_suggestion = generate_ai_suggestion(price_now, direction, indicators, tf_status)
-        advice = generate_advice(trend, direction, ai_suggestion, tf_status)
+        ai_suggestion = generate_ai_suggestion(price_now, indicators, atr_value)
 
         rows.append({
             "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
             "ATR": round(atr_value, 5), "ATR Status": atr_status,
-            "Trend": trend, "Divergence": direction, "TF": tf_status,
+            "Trend": trend,
             "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators),
             "Candle Pattern": candle_pattern,
-            "Volume Spike": "Yes" if volume_spike else "No",
-            "Signal Age": f"{age_minutes} min ago",
-            "AI Suggestion": ai_suggestion, "Advice": advice,
+            "AI Suggestion": ai_suggestion,
             "News Alert": check_news_alert(label)
         })
-    # ---------------- Table Layout ---------------- #
+# ---------------- Table Layout ---------------- #
 column_order = [
-    "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Divergence", "TF", "Reversal Signal",
-    "Confirmed Indicators", "Candle Pattern", "Volume Spike", "Signal Age",
-    "AI Suggestion", "Advice", "News Alert"
+    "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
+    "Confirmed Indicators", "Candle Pattern", "AI Suggestion", "News Alert"
 ]
 
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
@@ -319,32 +247,14 @@ styled_html += "<tr>" + "".join([
 
 def style_row(row):
     ai = row['AI Suggestion']
-    tf = row['TF']
     trend = row['Trend']
-    div = row['Divergence']
 
-    print(f"AI: {ai}, Trend: {trend}, Divergence: {div}, TF: {tf}")  # Debugging the condition
-
-    # Strong Bullish
-    if pd.notna(ai) and "Confidence: Strong" in ai and trend == div and div == "Bullish" and "Confirm Bullish" in tf:
-        return 'background-color: #add8e6;'  # Light Blue for Strong Bullish
-
-    # Strong Bearish
-    if pd.notna(ai) and "Confidence: Strong" in ai and trend == div and div == "Bearish" and "Confirm Bearish" in tf:
-        return 'background-color: #ffcccb;'  # Light Red for Strong Bearish
-
-    # Medium Bullish
-    if pd.notna(ai) and "Confidence: Medium" in ai and trend == div and div == "Bullish" and "Confirm Bullish" in tf:
-        return 'background-color: #ccffcc;'  # Light Green for Medium Bullish
-
-    # Medium Bearish
-    if pd.notna(ai) and "Confidence: Medium" in ai and trend == div and div == "Bearish" and "Confirm Bearish" in tf:
-        return 'background-color: #f5f5f5;'  # Light Gray for Medium Bearish
-
-    # Reversal signals
+    if pd.notna(ai) and "Confidence: Strong" in ai:
+        return 'background-color: #d4edda;'  # Light Green
+    if pd.notna(ai) and "Confidence: Medium" in ai:
+        return 'background-color: #d1ecf1;'  # Light Blue
     if "Reversal" in row['Reversal Signal']:
         return 'background-color: #fff0b3;'  # Yellow for Reversal Signals
-
     return ''
 
 def trend_color_text(trend):
@@ -357,6 +267,7 @@ if "Pair" in df_result.columns:
     df_sorted = df_result.sort_values(by="Pair", na_position='last')
 else:
     df_sorted = df_result
+
 for _, row in df_sorted.iterrows():
     style = style_row(row)
     styled_html += f"<tr style='{style}'>"
