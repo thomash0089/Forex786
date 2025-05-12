@@ -1,16 +1,17 @@
-# --- Signals with H & I (15-Min Timeframe | ATR + Candle Pattern Name) ---
+# --- Forex AI Signals (15-Min Timeframe | Smart Signal Tracking with Fresh Tag) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 import requests
 import numpy as np
+import json
+import os
 from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
-from pytz import timezone
+from pytz import timezone, UTC
 
 st.set_page_config(page_title="Forex AI Signals", layout="wide")
-st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>",
-            unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>", unsafe_allow_html=True)
 st_autorefresh(interval=120000, key="auto_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
@@ -18,31 +19,23 @@ symbols = {
     "EUR/USD": "EUR/USD", "GBP/USD": "GBP/USD", "USD/JPY": "USD/JPY",
     "AUD/USD": "AUD/USD", "USD/CAD": "USD/CAD", "USD/CHF": "USD/CHF",
     "XAU/USD": "XAU/USD", "WTI/USD": "WTI/USD", "EUR/JPY": "EUR/JPY", "NZD/USD": "NZD/USD",
-    "EUR/GBP": "EUR/GBP", "EUR/CAD": "EUR/CAD",
-    "GBP/JPY": "GBP/JPY", "EUR/AUD": "EUR/AUD", "AUD/JPY": "AUD/JPY",
-    "GBP/NZD": "GBP/NZD", "EUR/NZD": "EUR/NZD",  "XAG/USD": "XAG/USD",  # ✅ Silver added
+    "EUR/GBP": "EUR/GBP", "EUR/CAD": "EUR/CAD", "GBP/JPY": "GBP/JPY",
+    "EUR/AUD": "EUR/AUD", "AUD/JPY": "AUD/JPY", "GBP/NZD": "GBP/NZD",
+    "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
+}
 
-}
-news_events = {
-    "EUR/USD": [{"time": "10:30", "title": "Euro CPI Data"}],
-    "GBP/USD": [{"time": "11:00", "title": "BoE Governor Speech"}],
-    "USD/JPY": [{"time": "13:00", "title": "US Jobless Claims"}],
-    "AUD/USD": [{"time": "08:00", "title": "RBA Statement"}],
-    "USD/CAD": [{"time": "15:00", "title": "Canada Trade Balance"}],
-    "USD/CHF": [{"time": "14:00", "title": "US Fed Chair Remarks"}],
-    "XAU/USD": [{"time": "13:30", "title": "Gold Reserve Report"}],
-    "WTI/USD": [{"time": "12:30", "title": "Crude Oil Inventory"}],
-    "EUR/JPY": [{"time": "09:00", "title": "ECB Bulletin"}],
-    "NZD/USD": [{"time": "07:30", "title": "NZ Employment Report"}],
-    "EUR/GBP": [{"time": "10:00", "title": "UK & Euro Economic Sentiment"}],
-    "EUR/CAD": [{"time": "14:30", "title": "ECB & BoC Press Conference"}],
-    "GBP/JPY": [{"time": "11:30", "title": "UK Inflation & JPY Trade Balance"}],
-    "EUR/AUD": [{"time": "09:45", "title": "Eurozone GDP vs Australia CPI"}],
-    "AUD/JPY": [{"time": "08:15", "title": "RBA vs BOJ Rate Outlook"}],
-    "GBP/NZD": [{"time": "07:50", "title": "BoE vs RBNZ Rate Forecast"}],
-    "EUR/NZD": [{"time": "10:20", "title": "Euro Retail vs NZ Growth Data"}],
-    "XAG/USD": [{"time": "13:45", "title": "Silver Market Update"}],
-}
+# --- Signal storage ---
+if os.path.exists("signals.json"):
+    with open("signals.json", "r") as f:
+        previous_signals = json.load(f)
+else:
+    previous_signals = {}
+
+def save_signals():
+    with open("signals.json", "w") as f:
+        json.dump(previous_signals, f)
+
+# --- Indicator functions ---
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -56,7 +49,6 @@ def fetch_data(symbol, interval="15min", outputsize=200):
     df = df.astype(float).sort_index()
     return df
 
-
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = delta.where(delta > 0, 0)
@@ -66,6 +58,15 @@ def calculate_rsi(series, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+def calculate_macd(series):
+    ema12 = series.ewm(span=12, adjust=False).mean()
+    ema26 = series.ewm(span=26, adjust=False).mean()
+    macd = ema12 - ema26
+    signal = macd.ewm(span=9, adjust=False).mean()
+    return macd, signal
+
+def calculate_ema(series, period):
+    return series.ewm(span=period, adjust=False).mean()
 
 def calculate_atr(df, period=14):
     tr1 = df['high'] - df['low']
@@ -74,19 +75,6 @@ def calculate_atr(df, period=14):
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     atr = tr.rolling(window=period).mean()
     return atr
-
-
-def calculate_macd(series):
-    ema12 = series.ewm(span=12, adjust=False).mean()
-    ema26 = series.ewm(span=26, adjust=False).mean()
-    macd = ema12 - ema26
-    signal = macd.ewm(span=9, adjust=False).mean()
-    return macd, signal
-
-
-def calculate_ema(series, period):
-    return series.ewm(span=period, adjust=False).mean()
-
 
 def calculate_adx(df, period=14):
     df['TR'] = np.maximum(df['high'] - df['low'],
@@ -104,34 +92,27 @@ def calculate_adx(df, period=14):
     adx = dx.rolling(window=period).mean()
     return adx
 
-
 def detect_candle_pattern(df):
     o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
     current_open = o.iloc[-1]
     current_close = c.iloc[-1]
     current_high = h.iloc[-1]
     current_low = l.iloc[-1]
-
     body = abs(current_close - current_open)
     range_ = current_high - current_low
-
     previous_open = o.iloc[-2]
     previous_close = c.iloc[-2]
-
     if body < range_ * 0.1:
         return "Doji"
     if previous_close < previous_open and current_close > current_open and current_close > previous_open and current_open < previous_close:
         return "Bullish Engulfing"
     if previous_close > previous_open and current_close < current_open and current_close < previous_open and current_open > previous_close:
         return "Bearish Engulfing"
-    if body < range_ * 0.3 and (current_low < current_open and current_low < current_close) and (
-            current_high - max(current_open, current_close)) < body:
+    if body < range_ * 0.3 and (current_low < current_open and current_low < current_close) and (current_high - max(current_open, current_close)) < body:
         return "Hammer"
-    if body < range_ * 0.3 and (current_high > current_open and current_high > current_close) and (
-            min(current_open, current_close) - current_low) < body:
+    if body < range_ * 0.3 and (current_high > current_open and current_high > current_close) and (min(current_open, current_close) - current_low) < body:
         return "Shooting Star"
     return ""
-
 
 def detect_trend_reversal(df):
     if len(df) < 3:
@@ -147,9 +128,10 @@ def detect_trend_reversal(df):
     elif e9[-2] > e20[-2] and e9[-1] < e20[-1]:
         return "Reversal Forming Bearish"
     return ""
-def generate_ai_suggestion(price, indicators, atr):
+
+def generate_ai_suggestion(price, indicators, atr, signal_time):
     if not indicators:
-        return ""
+        return "", None
     sl = price - (atr * 1.2) if "Bullish" in indicators else price + (atr * 1.2)
     tp = price + (atr * 2.5) if "Bullish" in indicators else price - (atr * 2.5)
     count = len(indicators)
@@ -157,29 +139,16 @@ def generate_ai_suggestion(price, indicators, atr):
         confidence = "Strong"
     elif count == 3:
         confidence = "Medium"
-    elif count == 2:
-        confidence = "Low"
     else:
-        return ""
-    return f"{confidence} Signal @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
+        return "", None
+    text = f"{confidence} Signal @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
+    return text, signal_time
 
-
-def check_news_alert(pair):
-    now = datetime.now(timezone('Asia/Karachi'))
-    alert_list = []
-    for event in news_events.get(pair, []):
-        try:
-            event_time = datetime.strptime(event["time"], "%H:%M").replace(
-                year=now.year, month=now.month, day=now.day, tzinfo=timezone('Asia/Karachi'))
-            if timedelta(0) <= (event_time - now) <= timedelta(minutes=30):
-                alert_list.append(f"{event['title']} @ {event['time']}")
-        except:
-            continue
-    return " | ".join(alert_list) if alert_list else ""
-
-
-# ---------------- Table Rows ---------------- #
+# --- Signal Processing ---
 rows = []
+local_tz = timezone('Asia/Karachi')
+now = datetime.now(local_tz)
+
 for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
     if df is not None:
@@ -204,7 +173,6 @@ for label, symbol in symbols.items():
             indicators.append("Bullish")
         elif df['RSI'].iloc[-1] < 50:
             indicators.append("Bearish")
-
         if df['MACD'].iloc[-1] > df['MACD_Signal'].iloc[-1]:
             indicators.append("MACD")
         if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] and price_now > df['EMA9'].iloc[-1]:
@@ -220,75 +188,43 @@ for label, symbol in symbols.items():
             else "Sideways"
         )
 
-        ai_suggestion = generate_ai_suggestion(price_now, indicators, atr_value)
+        raw_time = df.index[-1]
+        candle_time = raw_time.replace(tzinfo=UTC).astimezone(local_tz) if raw_time.tzinfo is None else raw_time.astimezone(local_tz)
+
+        ai_suggestion, _ = generate_ai_suggestion(price_now, indicators, atr_value, candle_time)
+
+        if not ai_suggestion:
+            continue
+
+        # ⏱ Track signal age
+        if label in previous_signals and previous_signals[label]['signal'] == ai_suggestion:
+            signal_start = datetime.fromisoformat(previous_signals[label]['start_time'])
+        else:
+            signal_start = now
+            previous_signals[label] = {'signal': ai_suggestion, 'start_time': signal_start.isoformat()}
+
+        signal_age = int((now - signal_start).total_seconds() / 60)
+
+        if signal_age > 60:
+            del previous_signals[label]
+            continue
+
+        signal_age_text = f"{signal_age} min ago" if signal_age >= 1 else "Just now"
+        is_fresh = signal_age <= 10
 
         rows.append({
             "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
             "ATR": round(atr_value, 5), "ATR Status": atr_status,
-            "Trend": trend,
-            "Reversal Signal": reversal,
+            "Trend": trend, "Reversal Signal": reversal,
             "Confirmed Indicators": ", ".join(indicators),
             "Candle Pattern": candle_pattern,
             "AI Suggestion": ai_suggestion,
-            "News Alert": check_news_alert(label)
+            "Signal Age": signal_age_text,
+            "Fresh": "✅" if is_fresh else "",
+            "News Alert": ""
         })
-# ---------------- Table Layout ---------------- #
-column_order = [
-    "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
-    "Confirmed Indicators", "Candle Pattern", "AI Suggestion", "News Alert"
-]
 
-styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-styled_html += "<tr>" + "".join([
-    f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
-    for col in column_order
-]) + "</tr>"
+save_signals()
 
-
-def style_row(row):
-    ai = row['AI Suggestion']
-    trend = row['Trend']
-
-    if pd.notna(ai) and "Confidence: Strong" in ai:
-        return 'background-color: #d4edda;'  # Light Green
-    if pd.notna(ai) and "Confidence: Medium" in ai:
-        return 'background-color: #d1ecf1;'  # Light Blue
-    if "Reversal" in row['Reversal Signal']:
-        return 'background-color: #fff0b3;'  # Yellow for Reversal Signals
-    return ''
-
-def trend_color_text(trend):
-    color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "gray"
-    return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
-
-
-def confidence_score(text):
-    if pd.isna(text): return 0
-    if "Confidence: Strong" in text: return 3
-    if "Confidence: Medium" in text: return 2
-    if "Confidence: Low" in text: return 1
-    return 0
-
-df_result = pd.DataFrame(rows)
-df_result["Score"] = df_result["AI Suggestion"].apply(confidence_score)
-df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
-
-for _, row in df_sorted.iterrows():
-    style = style_row(row)
-    styled_html += f"<tr style='{style}'>"
-    for col in column_order:
-        val = row[col]
-        if col == "Pair":
-            val = f"<strong style='font-size: 18px;'>{val}</strong>"
-        elif col == "Trend":
-            val = trend_color_text(val)
-        styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
-    styled_html += "</tr>"
-
-styled_html += "</table>"
-st.markdown(styled_html, unsafe_allow_html=True)
-
-st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-st.text(f"Scanned Pairs: {len(rows)}")
-strongs = [r for r in rows if "Confidence: Strong" in r["AI Suggestion"]]
-st.text(f"Strong Signals Found: {len(strongs)}")
+# 🔽 Aapka existing table display yahan ayega
+# st.dataframe(pd.DataFrame(rows))  or your styled HTML table
