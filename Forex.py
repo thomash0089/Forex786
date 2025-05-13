@@ -1,17 +1,15 @@
-# --- Forex AI Signals (15-Min Timeframe | Smart Signal Tracking with Fresh Tag) ---
+# --- Forex AI Signals (15-Min Timeframe | Full Version with Signal Age Filtered to Last 30 Minutes) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 import requests
 import numpy as np
-import json
-import os
 from datetime import datetime, timedelta
 from scipy.signal import argrelextrema
 from pytz import timezone, UTC
 
-st.set_page_config(page_title="Forex AI Signals", layout="wide")
-st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex AI Signals (15-Min Timeframe)</h1>", unsafe_allow_html=True)
+st.set_page_config(page_title="Forex Rafay Signals", layout="wide")
+st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Forex Rafay Signals (15-Min Timeframe)</h1>", unsafe_allow_html=True)
 st_autorefresh(interval=120000, key="auto_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
@@ -24,18 +22,6 @@ symbols = {
     "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
 }
 
-# --- Signal storage ---
-if os.path.exists("signals.json"):
-    with open("signals.json", "r") as f:
-        previous_signals = json.load(f)
-else:
-    previous_signals = {}
-
-def save_signals():
-    with open("signals.json", "w") as f:
-        json.dump(previous_signals, f)
-
-# --- Indicator functions ---
 def fetch_data(symbol, interval="15min", outputsize=200):
     url = "https://api.twelvedata.com/time_series"
     params = {"symbol": symbol, "interval": interval, "outputsize": outputsize, "apikey": API_KEY}
@@ -144,11 +130,8 @@ def generate_ai_suggestion(price, indicators, atr, signal_time):
     text = f"{confidence} Signal @ {price:.5f} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {confidence}"
     return text, signal_time
 
-# --- Signal Processing ---
+# ---------------- Table Rows ---------------- #
 rows = []
-local_tz = timezone('Asia/Karachi')
-now = datetime.now(local_tz)
-
 for label, symbol in symbols.items():
     df = fetch_data(symbol, interval="15min")
     if df is not None:
@@ -188,29 +171,22 @@ for label, symbol in symbols.items():
             else "Sideways"
         )
 
+        local_tz = timezone('Asia/Karachi')
         raw_time = df.index[-1]
         candle_time = raw_time.replace(tzinfo=UTC).astimezone(local_tz) if raw_time.tzinfo is None else raw_time.astimezone(local_tz)
+        now = datetime.now(local_tz)
 
-        ai_suggestion, _ = generate_ai_suggestion(price_now, indicators, atr_value, candle_time)
+        ai_suggestion, signal_time = generate_ai_suggestion(price_now, indicators, atr_value, candle_time)
 
-        if not ai_suggestion:
-            continue
+        if signal_time:
+            signal_age = int((now - signal_time).total_seconds() / 60)
+            signal_age_text = f"{max(1, signal_age)} min ago"
 
-        # ⏱ Track signal age
-        if label in previous_signals and previous_signals[label]['signal'] == ai_suggestion:
-            signal_start = datetime.fromisoformat(previous_signals[label]['start_time'])
+            if signal_age > 30:
+                continue
         else:
-            signal_start = now
-            previous_signals[label] = {'signal': ai_suggestion, 'start_time': signal_start.isoformat()}
-
-        signal_age = int((now - signal_start).total_seconds() / 60)
-
-        if signal_age > 60:
-            del previous_signals[label]
-            continue
-
-        signal_age_text = f"{signal_age} min ago" if signal_age >= 1 else "Just now"
-        is_fresh = signal_age <= 10
+            ai_suggestion = ""
+            signal_age_text = ""
 
         rows.append({
             "Pair": label, "Price": round(price_now, 5), "RSI": round(df['RSI'].iloc[-1], 2),
@@ -220,11 +196,61 @@ for label, symbol in symbols.items():
             "Candle Pattern": candle_pattern,
             "AI Suggestion": ai_suggestion,
             "Signal Age": signal_age_text,
-            "Fresh": "✅" if is_fresh else "",
             "News Alert": ""
         })
 
-save_signals()
+# ---------------- Display Table ---------------- #
+column_order = [
+    "Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
+    "Confirmed Indicators", "Candle Pattern", "AI Suggestion", "Signal Age", "News Alert"
+]
 
-# 🔽 Aapka existing table display yahan ayega
-# st.dataframe(pd.DataFrame(rows))  or your styled HTML table
+def style_row(row):
+    ai = row['AI Suggestion']
+    if pd.notna(ai) and "Confidence: Strong" in ai:
+        return 'background-color: #d4edda;'
+    if pd.notna(ai) and "Confidence: Medium" in ai:
+        return 'background-color: #d1ecf1;'
+    if "Reversal" in row['Reversal Signal']:
+        return 'background-color: #fff0b3;'
+    return ''
+
+def trend_color_text(trend):
+    color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "gray"
+    return f"<span style='color:{color}; font-weight:bold;'>{trend}</span>"
+
+def confidence_score(text):
+    if pd.isna(text): return 0
+    if "Confidence: Strong" in text: return 3
+    if "Confidence: Medium" in text: return 2
+    if "Confidence: Low" in text: return 1
+    return 0
+
+df_result = pd.DataFrame(rows)
+df_result["Score"] = df_result["AI Suggestion"].apply(confidence_score)
+df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
+
+styled_html = "<table style='width:100%; border-collapse: collapse;'>"
+styled_html += "<tr>" + "".join([
+    f"<th style='border: 1px solid #ccc; padding: 6px; background-color:#e0e0e0'>{col}</th>"
+    for col in column_order
+]) + "</tr>"
+
+for _, row in df_sorted.iterrows():
+    style = style_row(row)
+    styled_html += f"<tr style='{style}'>"
+    for col in column_order:
+        val = row[col]
+        if col == "Pair":
+            val = f"<strong style='font-size: 18px;'>{val}</strong>"
+        elif col == "Trend":
+            val = trend_color_text(val)
+        styled_html += f"<td style='border: 1px solid #ccc; padding: 6px;'>{val}</td>"
+    styled_html += "</tr>"
+
+styled_html += "</table>"
+st.markdown(styled_html, unsafe_allow_html=True)
+
+st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.text(f"Scanned Pairs: {len(rows)}")
+st.text(f"Strong Signals Found: {len([r for r in rows if 'Confidence: Strong' in r['AI Suggestion']])}")
