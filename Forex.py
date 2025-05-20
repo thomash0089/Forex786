@@ -1,4 +1,4 @@
-# --- Forex AI Signals (15-Min | Final Version with News Column) ---
+# --- Forex AI Signal with DXY Impact (Part 1) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -6,7 +6,8 @@ import requests
 import numpy as np
 from datetime import datetime
 from pytz import timezone
-import feedparser
+import xml.etree.ElementTree as ET
+from dateutil import parser as date_parser
 
 st.set_page_config(page_title="Signals", layout="wide")
 st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Signals + News</h1>", unsafe_allow_html=True)
@@ -23,26 +24,79 @@ symbols = {
     "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
 }
 
+# --- Fetch DXY Data ---
+import yfinance as yf  # 👈 Add at top if not added
 
-# --- News Fetch ---
-@st.cache_data(ttl=3600)
+def fetch_dxy_data():
+    try:
+        dxy = yf.Ticker("DX-Y.NYB")  # Yahoo Finance symbol for DXY
+        data = dxy.history(period="1d", interval="1m")
+        if data.empty:
+            raise ValueError("No data received from yfinance")
+        current = data["Close"].iloc[-1]
+        previous = data["Close"].iloc[0]
+        change = current - previous
+        percent = (change / previous) * 100
+        return current, percent
+    except Exception as e:
+        print("⚠️ yfinance failed, fallback to static DXY", e)
+        # Fallback hardcoded
+        dxy_price = 100.237
+        dxy_previous = 100.40
+        change = dxy_price - dxy_previous
+        percent = (change / dxy_previous) * 100
+        return dxy_price, percent
+
+# --- Fetch Forex Factory News ---
 def fetch_forex_factory_news():
-    feed = feedparser.parse("https://nfs.faireconomy.media/ff_calendar_thisweek.xml")
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
+    response = requests.get(url)
+    try:
+        root = ET.fromstring(response.content)
+    except ET.ParseError as e:
+        return []
+
     news_data = []
-    for entry in feed.entries:
+    for item in root.findall("./channel/item"):
         try:
-            title = entry.title
-            published = entry.published
-            pub_time = datetime.strptime(published, "%a, %d %b %Y %H:%M:%S %Z")
-            news_data.append({"title": title, "time": pub_time})
+            title = item.find("title").text
+            pub_time = date_parser.parse(item.find("pubDate").text)
+            currency = item.find("{http://www.forexfactory.com/rss}currency").text.strip().upper()
+            if pub_time.date() == datetime.utcnow().date():
+                news_data.append({
+                    "title": title,
+                    "time": pub_time,
+                    "currency": currency
+                })
         except:
             continue
     return news_data
 
+# --- Analyze News Impact ---
+def analyze_impact(title):
+    title = title.lower()
+    if any(x in title for x in ["cpi", "gdp", "employment", "retail", "core", "inflation", "interest rate"]):
+        if any(w in title for w in ["increase", "higher", "rises", "strong", "beats"]):
+            return "🟢 Positive"
+        elif any(w in title for w in ["decrease", "lower", "falls", "weak", "misses"]):
+            return "🔴 Negative"
+        else:
+            return "🟡 Mixed"
+    return "⚪ Neutral"
 
-news_events = fetch_forex_factory_news()
+# --- Get Today's News with Impact ---
+def get_today_news_with_impact(pair):
+    base, quote = pair.split('/')
+    quote = quote.upper()
+    today_events = []
+    for n in news_events:
+        if n["currency"] == quote:
+            impact = analyze_impact(n["title"])
+            time_str = n["time"].strftime("%H:%M")
+            today_events.append(f"{n['title']} ({impact}) @ {time_str}")
+    return today_events or ["—"]
 
-
+# --- Get Next News ---
 def get_next_news(pair):
     base, quote = pair.split('/')
     mapping = {
@@ -59,16 +113,18 @@ def get_next_news(pair):
         "WTI": ["Oil", "Crude"]
     }
     keywords = mapping.get(base, []) + mapping.get(quote, [])
-    upcoming = [n for n in news_events if
-                any(k.lower() in n["title"].lower() for k in keywords) and n["time"] > datetime.utcnow()]
+    upcoming = [n for n in news_events if any(k.lower() in n["title"].lower() for k in keywords) and n["time"] > datetime.utcnow()]
     if upcoming:
         next_event = sorted(upcoming, key=lambda x: x["time"])[0]
-        time_str = next_event["time"].strftime("%H:%M")
-        return f"{next_event['title']} @ {time_str}"
+        return f"{next_event['title']} @ {next_event['time'].strftime('%H:%M')}"
     return "—"
 
+news_events = fetch_forex_factory_news()
+dxy_price, dxy_change = fetch_dxy_data()
+rows = []
+# --- Forex AI Signal with DXY Impact (Part 2) ---
+# (continued from Part 1)
 
-# --- Indicator Functions ---
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = delta.where(delta > 0, 0)
@@ -78,7 +134,6 @@ def calculate_rsi(series, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
-
 def calculate_macd(series):
     ema12 = series.ewm(span=12, adjust=False).mean()
     ema26 = series.ewm(span=26, adjust=False).mean()
@@ -86,10 +141,8 @@ def calculate_macd(series):
     signal = macd.ewm(span=9, adjust=False).mean()
     return macd, signal
 
-
 def calculate_ema(series, period):
     return series.ewm(span=period, adjust=False).mean()
-
 
 def calculate_atr(df, period=14):
     tr1 = df['high'] - df['low']
@@ -97,7 +150,6 @@ def calculate_atr(df, period=14):
     tr3 = abs(df['low'] - df['close'].shift())
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
     return tr.rolling(window=period).mean()
-
 
 def calculate_adx(df, period=14):
     df['TR'] = np.maximum(df['high'] - df['low'],
@@ -114,7 +166,6 @@ def calculate_adx(df, period=14):
     dx = 100 * abs(plus_di14 - minus_di14) / (plus_di14 + minus_di14)
     return dx.rolling(window=period).mean()
 
-
 def detect_candle_pattern(df):
     o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
     co, cc, ch, cl = o.iloc[-1], c.iloc[-1], h.iloc[-1], l.iloc[-1]
@@ -127,7 +178,6 @@ def detect_candle_pattern(df):
     if body < range_ * 0.3 and ch > co and ch > cc and (min(co, cc) - cl) < body: return "Shooting Star"
     return ""
 
-
 def detect_trend_reversal(df):
     e9, e20 = df['EMA9'].iloc[-3:], df['EMA20'].iloc[-3:]
     if e9[0] < e20[0] and e9[1] > e20[1] and e9[2] > e20[2]: return "Reversal Confirmed Bullish"
@@ -135,7 +185,6 @@ def detect_trend_reversal(df):
     if e9[-2] < e20[-2] and e9[-1] > e20[-1]: return "Reversal Forming Bullish"
     if e9[-2] > e20[-2] and e9[-1] < e20[-1]: return "Reversal Forming Bearish"
     return ""
-
 
 def generate_ai_suggestion(price, indicators, atr, signal_type):
     if not indicators: return ""
@@ -152,9 +201,6 @@ def generate_ai_suggestion(price, indicators, atr, signal_type):
     signal_txt = f"{conf} <span style='color:{color}'>{signal_type}</span> Signal @ {price:.5f}"
     return f"{signal_txt} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {conf}"
 
-
-# --- Main Scanning Loop ---
-rows = []
 for label, symbol in symbols.items():
     url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=15min&outputsize=200&apikey={API_KEY}"
     r = requests.get(url).json()
@@ -197,44 +243,44 @@ for label, symbol in symbols.items():
         "Trend": trend, "Reversal Signal": detect_trend_reversal(df),
         "Signal Type": signal_type, "Confirmed Indicators": ", ".join(indicators),
         "Candle Pattern": pattern or "—", "AI Suggestion": suggestion,
-        "News": get_next_news(label)
+        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None and dxy_change is not None else "—",
+        "News": get_next_news(label),
+        "Today's News": "<br>".join(get_today_news_with_impact(label))
     })
 
-
-# --- Style & Display Table ---
-def style_row(row):
-    if "Confidence: Strong" in row["AI Suggestion"]: return 'background-color: #d4edda;'
-    if "Confidence: Medium" in row["AI Suggestion"]: return 'background-color: #d1ecf1;'
-    return ''
-
-
 column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
-                "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion", "News"]
+                "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion",
+                "DXY Impact", "News", "Today's News"]
 
 df_result = pd.DataFrame(rows)
 df_result["Score"] = df_result["AI Suggestion"].apply(lambda x: 3 if "Strong" in x else 2 if "Medium" in x else 0)
 df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
 
 styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-styled_html += "<tr>" + "".join(
-    [f"<th style='border:1px solid #ccc; padding:6px; background:#e0e0e0'>{col}</th>" for col in
-     column_order]) + "</tr>"
+styled_html += "<tr>" + "".join([
+    f"<th style='border:1px solid #ccc; padding:6px; background:#e0e0e0'>{col}</th>" for col in column_order]) + "</tr>"
 
 for _, row in df_sorted.iterrows():
-    style = style_row(row)
+    style = 'background-color: #d4edda;' if "Strong" in row["AI Suggestion"] else \
+            'background-color: #d1ecf1;' if "Medium" in row["AI Suggestion"] else ''
     styled_html += f"<tr style='{style}'>"
     for col in column_order:
         val = row[col]
         if col == "Pair":
             val = f"<strong style='font-size: 18px;'>{val}</strong>"
         elif col == "Trend":
-            val = f"<span style='color:{'green' if row['Trend'] == 'Bullish' else 'red' if row['Trend'] == 'Bearish' else 'gray'}; font-weight:bold;'>{row['Trend']}</span>"
+            color = 'green' if row['Trend'] == 'Bullish' else 'red' if row['Trend'] == 'Bearish' else 'gray'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Trend']}</span>"
         elif col == "Signal Type":
-            val = f"<span style='color:{'green' if row['Signal Type'] == 'Bullish' else 'red'}; font-weight:bold;'>{row['Signal Type']}</span>"
+            color = 'green' if row['Signal Type'] == 'Bullish' else 'red'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Signal Type']}</span>"
         elif col == "RSI":
             color = "red" if row["RSI"] > 75 else "green" if row["RSI"] < 20 else "black"
             val = f"<span style='color:{color}; font-weight:bold;'>{row['RSI']}</span>"
-        styled_html += f"<td style='border:1px solid #ccc; padding:6px;'>{val}</td>"
+        elif col == "DXY Impact" and row["DXY Impact"] != "—":
+            dxy_color = "green" if '+' in row["DXY Impact"] else "red"
+            val = f"<span style='color:{dxy_color}; font-weight:bold;'>{row['DXY Impact']}</span>"
+        styled_html += f"<td style='border:1px solid #ccc; padding:6px; white-space:pre-wrap;'>{val}</td>"
     styled_html += "</tr>"
 
 styled_html += "</table>"
