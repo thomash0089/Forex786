@@ -1,4 +1,4 @@
-# --- Forex AI Signal with DXY Impact (Part 1) ---
+# --- Forex AI Signal with RSI Sound Alert (Part 1/2) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -8,6 +8,8 @@ from datetime import datetime
 from pytz import timezone
 import xml.etree.ElementTree as ET
 from dateutil import parser as date_parser
+import streamlit.components.v1 as components
+import yfinance as yf
 
 st.set_page_config(page_title="Signals", layout="wide")
 st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Signals + News</h1>", unsafe_allow_html=True)
@@ -24,12 +26,18 @@ symbols = {
     "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
 }
 
-# --- Fetch DXY Data ---
-import yfinance as yf  # 👈 Add at top if not added
+# --- Play Sound Alert if RSI exceeds threshold ---
+def play_rsi_alert():
+    components.html("""
+    <audio autoplay>
+        <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
+    </audio>
+    """, height=0)
 
+# --- Fetch DXY Data ---
 def fetch_dxy_data():
     try:
-        dxy = yf.Ticker("DX-Y.NYB")  # Yahoo Finance symbol for DXY
+        dxy = yf.Ticker("DX-Y.NYB")
         data = dxy.history(period="1d", interval="1m")
         if data.empty:
             raise ValueError("No data received from yfinance")
@@ -40,7 +48,6 @@ def fetch_dxy_data():
         return current, percent
     except Exception as e:
         print("⚠️ yfinance failed, fallback to static DXY", e)
-        # Fallback hardcoded
         dxy_price = 100.237
         dxy_previous = 100.40
         change = dxy_price - dxy_previous
@@ -72,7 +79,11 @@ def fetch_forex_factory_news():
             continue
     return news_data
 
-# --- Analyze News Impact ---
+news_events = fetch_forex_factory_news()
+dxy_price, dxy_change = fetch_dxy_data()
+rows = []
+# --- Continued: Forex AI Signal with RSI Sound Alert (Part 2/2) ---
+
 def analyze_impact(title):
     title = title.lower()
     if any(x in title for x in ["cpi", "gdp", "employment", "retail", "core", "inflation", "interest rate"]):
@@ -84,7 +95,6 @@ def analyze_impact(title):
             return "🟡 Mixed"
     return "⚪ Neutral"
 
-# --- Get Today's News with Impact ---
 def get_today_news_with_impact(pair):
     base, quote = pair.split('/')
     quote = quote.upper()
@@ -96,7 +106,6 @@ def get_today_news_with_impact(pair):
             today_events.append(f"{n['title']} ({impact}) @ {time_str}")
     return today_events or ["—"]
 
-# --- Get Next News ---
 def get_next_news(pair):
     base, quote = pair.split('/')
     mapping = {
@@ -118,12 +127,6 @@ def get_next_news(pair):
         next_event = sorted(upcoming, key=lambda x: x["time"])[0]
         return f"{next_event['title']} @ {next_event['time'].strftime('%H:%M')}"
     return "—"
-
-news_events = fetch_forex_factory_news()
-dxy_price, dxy_change = fetch_dxy_data()
-rows = []
-# --- Forex AI Signal with DXY Impact (Part 2) ---
-# (continued from Part 1)
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -219,14 +222,19 @@ for label, symbol in symbols.items():
 
     price = df["close"].iloc[-1]
     atr = df["ATR"].iloc[-1]
-    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] \
-        else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
+    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
+
+    # 🔔 RSI Alert Trigger
+    rsi_val = df["RSI"].iloc[-1]
+    if rsi_val > 70 or rsi_val < 20:
+        st.warning(f"🔔 RSI Alert for {label}: RSI = {rsi_val:.2f}")
+        play_rsi_alert()
 
     indicators = []
     signal_type = ""
-    if df["RSI"].iloc[-1] > 50:
+    if rsi_val > 50:
         indicators.append("Bullish"); signal_type = "Bullish"
-    elif df["RSI"].iloc[-1] < 50:
+    elif rsi_val < 50:
         indicators.append("Bearish"); signal_type = "Bearish"
     if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
     if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
@@ -238,7 +246,7 @@ for label, symbol in symbols.items():
     if not suggestion: continue
 
     rows.append({
-        "Pair": label, "Price": round(price, 5), "RSI": round(df["RSI"].iloc[-1], 2),
+        "Pair": label, "Price": round(price, 5), "RSI": round(rsi_val, 2),
         "ATR": round(atr, 5), "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
         "Trend": trend, "Reversal Signal": detect_trend_reversal(df),
         "Signal Type": signal_type, "Confirmed Indicators": ", ".join(indicators),
@@ -288,4 +296,3 @@ st.markdown(styled_html, unsafe_allow_html=True)
 st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 st.text(f"Strong Signals Found: {len([r for r in rows if 'Strong' in r['AI Suggestion']])}")
-
