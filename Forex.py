@@ -205,7 +205,7 @@ def generate_ai_suggestion(price, indicators, atr, signal_type):
     return f"{signal_txt} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {conf}"
 
 for label, symbol in symbols.items():
-    url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=15min&outputsize=200&apikey={API_KEY}"
+    url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=5min&outputsize=200&apikey={API_KEY}"
     r = requests.get(url).json()
     if "values" not in r: continue
     df = pd.DataFrame(r["values"])
@@ -293,6 +293,6 @@ for _, row in df_sorted.iterrows():
 
 styled_html += "</table>"
 st.markdown(styled_html, unsafe_allow_html=True)
-st.caption(f"Timeframe: 15-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.caption(f"Timeframe: 5-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 st.text(f"Strong Signals Found: {len([r for r in rows if 'Strong' in r['AI Suggestion']])}")
