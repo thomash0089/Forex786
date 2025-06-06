@@ -1,4 +1,4 @@
-# --- Forex AI Signal with RSI Sound Alert + RSI Divergence (Part 1/2) ---
+# --- Forex AI Signal with RSI Divergence and Sound Alert (Part 1/2) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -26,6 +26,7 @@ symbols = {
     "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
 }
 
+# --- Play Sound Alert if RSI exceeds threshold ---
 def play_rsi_alert():
     components.html("""
     <audio autoplay>
@@ -33,6 +34,7 @@ def play_rsi_alert():
     </audio>
     """, height=0)
 
+# --- Fetch DXY Data ---
 def fetch_dxy_data():
     try:
         dxy = yf.Ticker("DX-Y.NYB")
@@ -44,20 +46,21 @@ def fetch_dxy_data():
         change = current - previous
         percent = (change / previous) * 100
         return current, percent
-    except Exception:
-        # Fallback static data if API fails
+    except Exception as e:
+        print("⚠️ yfinance failed, fallback to static DXY", e)
         dxy_price = 100.237
         dxy_previous = 100.40
         change = dxy_price - dxy_previous
         percent = (change / dxy_previous) * 100
         return dxy_price, percent
 
+# --- Fetch Forex Factory News ---
 def fetch_forex_factory_news():
     url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
     response = requests.get(url)
     try:
         root = ET.fromstring(response.content)
-    except ET.ParseError:
+    except ET.ParseError as e:
         return []
 
     news_data = []
@@ -78,28 +81,9 @@ def fetch_forex_factory_news():
 
 news_events = fetch_forex_factory_news()
 dxy_price, dxy_change = fetch_dxy_data()
+rows = []
 
-def analyze_impact(title):
-    title = title.lower()
-    if any(x in title for x in ["cpi", "gdp", "employment", "retail", "core", "inflation", "interest rate"]):
-        if any(w in title for w in ["increase", "higher", "rises", "strong", "beats"]):
-            return "🟢 Positive"
-        elif any(w in title for w in ["decrease", "lower", "falls", "weak", "misses"]):
-            return "🔴 Negative"
-        else:
-            return "🟡 Mixed"
-    return "⚪ Neutral"
-
-def get_today_news_with_impact(pair):
-    base, quote = pair.split('/')
-    quote = quote.upper()
-    today_events = []
-    for n in news_events:
-        if n["currency"] == quote:
-            impact = analyze_impact(n["title"])
-            time_str = n["time"].strftime("%H:%M")
-            today_events.append(f"{n['title']} ({impact}) @ {time_str}")
-    return today_events or ["—"]
+# --- Indicator Calculation Functions ---
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -141,107 +125,253 @@ def calculate_adx(df, period=14):
     minus_di14 = 100 * (minus_dm14 / tr14)
     dx = 100 * abs(plus_di14 - minus_di14) / (plus_di14 + minus_di14)
     return dx.rolling(window=period).mean()
-# --- Forex AI Signal with RSI Sound Alert + RSI Divergence (Part 2/2) ---
 
-def fetch_candles(symbol, interval='15m', limit=100):
-    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol.replace('/','')}&interval={interval}&limit={limit}"
+# --- Candle Pattern Detection ---
+def detect_candle_pattern(df):
+    o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
+    co, cc, ch, cl = o.iloc[-1], c.iloc[-1], h.iloc[-1], l.iloc[-1]
+    po, pc = o.iloc[-2], c.iloc[-2]
+    body, range_ = abs(cc - co), ch - cl
+    if body < range_ * 0.1: return "Doji"
+    if pc < po and cc > co and cc > po and co < pc: return "Bullish Engulfing"
+    if pc > po and cc < co and cc < po and co > pc: return "Bearish Engulfing"
+    if body < range_ * 0.3 and cl < co and cl < cc and (ch - max(co, cc)) < body: return "Hammer"
+    if body < range_ * 0.3 and ch > co and ch > cc and (min(co, cc) - cl) < body: return "Shooting Star"
+    return ""
+
+# --- Trend Reversal Detection ---
+def detect_trend_reversal(df):
+    e9, e20 = df['EMA9'].iloc[-3:], df['EMA20'].iloc[-3:]
+    if e9[0] < e20[0] and e9[1] > e20[1] and e9[2] > e20[2]: return "Reversal Confirmed Bullish"
+    if e9[0] > e20[0] and e9[1] < e20[1] and e9[2] < e20[2]: return "Reversal Confirmed Bearish"
+    if e9[-2] < e20[-2] and e9[-1] > e20[-1]: return "Reversal Forming Bullish"
+    if e9[-2] > e20[-2] and e9[-1] < e20[-1]: return "Reversal Forming Bearish"
+    return ""
+
+# --- AI Suggestion Generator ---
+def generate_ai_suggestion(price, indicators, atr, signal_type):
+    if not indicators: return ""
+    sl = price - (atr * 1.2) if signal_type == "Bullish" else price + (atr * 1.2)
+    tp = price + (atr * 2.5) if signal_type == "Bullish" else price - (atr * 2.5)
+    count = len(indicators)
+    if count >= 4:
+        conf = "Strong"
+    elif count == 3:
+        conf = "Medium"
+    else:
+        return ""
+    color = "green" if signal_type == "Bullish" else "red"
+    signal_txt = f"{conf} <span style='color:{color}'>{signal_type}</span> Signal @ {price:.5f}"
+    return f"{signal_txt} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {conf}"
+
+# --- News Impact & Fetch Helpers ---
+def analyze_impact(title):
+    title = title.lower()
+    if any(x in title for x in ["cpi", "gdp", "employment", "retail", "core", "inflation", "interest rate"]):
+        if any(w in title for w in ["increase", "higher", "rises", "expands", "beats"]):
+            return "Positive"
+        if any(w in title for w in ["decrease", "lower", "falls", "contracts", "misses"]):
+            return "Negative"
+    return "Neutral"
+
+def currency_news(currency):
+    return [news for news in news_events if news['currency'] == currency]
+
+# --- RSI Divergence Detection Helpers ---
+
+def find_local_extrema(series, order=3):
+    """
+    Find local minima and maxima indices in the series.
+    """
+    minima, maxima = [], []
+    for i in range(order, len(series) - order):
+        window = series[i - order:i + order + 1]
+        if series[i] == min(window):
+            minima.append(i)
+        if series[i] == max(window):
+            maxima.append(i)
+    return minima, maxima
+
+def check_rsi_divergence(df, lookback=30):
+    """
+    Detect RSI bullish and bearish divergence on 5-min data.
+    Returns a string: "Bullish Divergence", "Bearish Divergence", or ""
+    """
+    if len(df) < lookback:
+        return ""
+    prices = df['close'].iloc[-lookback:].reset_index(drop=True)
+    rsi = df['RSI'].iloc[-lookback:].reset_index(drop=True)
+
+    min_idx, max_idx = find_local_extrema(prices)
+
+    # Bullish divergence: price lower low, RSI higher low
+    for i in range(len(min_idx) - 1):
+        idx1, idx2 = min_idx[i], min_idx[i + 1]
+        if idx2 <= idx1:
+            continue
+        price_low_1 = prices.iloc[idx1]
+        price_low_2 = prices.iloc[idx2]
+        rsi_low_1 = rsi.iloc[idx1]
+        rsi_low_2 = rsi.iloc[idx2]
+        if price_low_2 < price_low_1 and rsi_low_2 > rsi_low_1:
+            return "Bullish Divergence"
+
+    # Bearish divergence: price higher high, RSI lower high
+    for i in range(len(max_idx) - 1):
+        idx1, idx2 = max_idx[i], max_idx[i + 1]
+        if idx2 <= idx1:
+            continue
+        price_high_1 = prices.iloc[idx1]
+        price_high_2 = prices.iloc[idx2]
+        rsi_high_1 = rsi.iloc[idx1]
+        rsi_high_2 = rsi.iloc[idx2]
+        if price_high_2 > price_high_1 and rsi_high_2 < rsi_high_1:
+            return "Bearish Divergence"
+
+    return ""
+# --- Main Data Processing Loop and Display (Part 2/2) ---
+
+column_order = [
+    "Pair", "Price", "RSI", "RSI Divergence", "ATR", "ATR Status", "Trend",
+    "Reversal Signal", "Signal Type", "Confirmed Indicators", "Candle Pattern",
+    "AI Suggestion", "DXY Impact", "News", "Today's News"
+]
+
+for pair, symbol in symbols.items():
     try:
-        data = requests.get(url).json()
-        df = pd.DataFrame(data, columns=[
-            'open_time', 'open', 'high', 'low', 'close', 'volume',
-            'close_time', 'quote_asset_volume', 'number_of_trades',
-            'taker_buy_base', 'taker_buy_quote', 'ignore'
-        ])
-        df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
+        # Fetch 5-min data from API (replace YOUR_ENDPOINT with actual)
+        url = f"https://api.example.com/v1/forex/{symbol}/5min?apikey={API_KEY}"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        df = pd.DataFrame(data["prices"])  # Adjust to actual API data structure
+        if df.empty or len(df) < 50:
+            continue
+        # Expected columns: timestamp, open, high, low, close, volume
         df['close'] = df['close'].astype(float)
+        df['open'] = df['open'].astype(float)
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
-        df['open'] = df['open'].astype(float)
         df['volume'] = df['volume'].astype(float)
-        return df
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df = df.sort_values(by='timestamp').reset_index(drop=True)
+
+        # Indicators
+        df['RSI'] = calculate_rsi(df['close'])
+        df['MACD'], df['MACD_signal'] = calculate_macd(df['close'])
+        df['EMA9'] = calculate_ema(df['close'], 9)
+        df['EMA20'] = calculate_ema(df['close'], 20)
+        df['ADX'] = calculate_adx(df)
+        df['ATR'] = calculate_atr(df)
+
+        # Latest values
+        price = df['close'].iloc[-1]
+        rsi = df['RSI'].iloc[-1]
+        atr = df['ATR'].iloc[-1]
+
+        # RSI alert if RSI > 75 or RSI < 25
+        if rsi > 75 or rsi < 25:
+            play_rsi_alert()
+
+        # ATR Status
+        atr_status = "High Volatility" if atr > 0.0015 else "Low Volatility"
+
+        # Trend based on EMA9 and EMA20
+        trend = "Bullish" if df['EMA9'].iloc[-1] > df['EMA20'].iloc[-1] else "Bearish"
+
+        # Detect reversal
+        reversal_signal = detect_trend_reversal(df)
+
+        # Candle Pattern
+        candle_pattern = detect_candle_pattern(df)
+
+        # Confirmed indicators for signal
+        confirmed_indicators = []
+        if rsi < 30:
+            confirmed_indicators.append("RSI Oversold")
+        if rsi > 70:
+            confirmed_indicators.append("RSI Overbought")
+        if df['MACD'].iloc[-1] > df['MACD_signal'].iloc[-1]:
+            confirmed_indicators.append("MACD Bullish")
+        else:
+            confirmed_indicators.append("MACD Bearish")
+        if trend == "Bullish":
+            confirmed_indicators.append("EMA Bullish")
+        else:
+            confirmed_indicators.append("EMA Bearish")
+        if reversal_signal:
+            confirmed_indicators.append(reversal_signal)
+
+        # RSI Divergence
+        rsi_divergence = check_rsi_divergence(df)
+        if rsi_divergence:
+            confirmed_indicators.append(rsi_divergence)
+
+        # Signal type based on confirmed indicators
+        if any(x in confirmed_indicators for x in ["RSI Oversold", "MACD Bullish", "EMA Bullish", "Reversal Confirmed Bullish", "Bullish Divergence"]):
+            signal_type = "Bullish"
+        elif any(x in confirmed_indicators for x in ["RSI Overbought", "MACD Bearish", "EMA Bearish", "Reversal Confirmed Bearish", "Bearish Divergence"]):
+            signal_type = "Bearish"
+        else:
+            signal_type = "Neutral"
+
+        # AI suggestion
+        ai_suggestion = generate_ai_suggestion(price, confirmed_indicators, atr, signal_type)
+
+        # DXY Impact
+        dxy_impact = "Positive" if dxy_change > 0 else "Negative"
+
+        # News related to pair's currencies
+        primary_currency = pair.split("/")[0]
+        related_news = currency_news(primary_currency)
+        news_titles = [f"{n['time'].strftime('%H:%M')} {n['title']}" for n in related_news]
+        todays_news = "<br>".join(news_titles) if news_titles else "—"
+
+        rows.append({
+            "Pair": pair,
+            "Price": f"{price:.5f}",
+            "RSI": f"{rsi:.2f}",
+            "RSI Divergence": rsi_divergence or "—",
+            "ATR": f"{atr:.6f}",
+            "ATR Status": atr_status,
+            "Trend": trend,
+            "Reversal Signal": reversal_signal or "—",
+            "Signal Type": signal_type,
+            "Confirmed Indicators": ", ".join(confirmed_indicators),
+            "Candle Pattern": candle_pattern or "—",
+            "AI Suggestion": ai_suggestion or "—",
+            "DXY Impact": dxy_impact,
+            "News": "<br>".join(news_titles[:3]) if news_titles else "—",
+            "Today's News": todays_news
+        })
+
     except Exception as e:
-        st.error(f"Error fetching data for {symbol}: {e}")
-        return pd.DataFrame()
+        print(f"Error processing {pair}: {e}")
+        continue
 
-def detect_rsi_divergence(df, rsi_period=14):
-    df['rsi'] = calculate_rsi(df['close'], rsi_period)
-    divergences = []
-    # Very simple divergence detection:
-    # Find local lows in price & check if RSI forms higher low (bullish divergence)
-    # Find local highs in price & check if RSI forms lower high (bearish divergence)
-    for i in range(2, len(df)-2):
-        price_low = df['low'][i] < df['low'][i-1] and df['low'][i] < df['low'][i+1]
-        rsi_low = df['rsi'][i] < df['rsi'][i-1] and df['rsi'][i] < df['rsi'][i+1]
-        price_high = df['high'][i] > df['high'][i-1] and df['high'][i] > df['high'][i+1]
-        rsi_high = df['rsi'][i] > df['rsi'][i-1] and df['rsi'][i] > df['rsi'][i+1]
+# --- Display Table ---
+def style_table(df):
+    def color_rsi_divergence(val):
+        if "Bullish" in val:
+            return "color: green; font-weight: bold"
+        elif "Bearish" in val:
+            return "color: red; font-weight: bold"
+        return ""
 
-        # Bullish divergence
-        if price_low and (df['rsi'][i] > df['rsi'][i-2]):
-            divergences.append((df.index[i], 'Bullish Divergence'))
+    def color_signal_type(val):
+        if val == "Bullish":
+            return "color: green; font-weight: bold"
+        elif val == "Bearish":
+            return "color: red; font-weight: bold"
+        return ""
 
-        # Bearish divergence
-        if price_high and (df['rsi'][i] < df['rsi'][i-2]):
-            divergences.append((df.index[i], 'Bearish Divergence'))
-    return divergences
+    styled = df.style.applymap(color_rsi_divergence, subset=["RSI Divergence"])\
+                      .applymap(color_signal_type, subset=["Signal Type"])\
+                      .set_properties(**{'white-space': 'pre-wrap'})\
+                      .hide(axis="index")
+    return styled
 
-def generate_signal(df):
-    if df.empty:
-        return "No data"
+df_display = pd.DataFrame(rows, columns=column_order)
+df_display_sorted = df_display.sort_values(by="Signal Type", ascending=False).reset_index(drop=True)
 
-    df['rsi'] = calculate_rsi(df['close'])
-    df['ema12'] = calculate_ema(df['close'], 12)
-    df['ema26'] = calculate_ema(df['close'], 26)
-    df['macd'], df['macd_signal'] = calculate_macd(df['close'])
-    df['adx'] = calculate_adx(df)
-    latest = df.iloc[-1]
-
-    signal = "Hold"
-    if latest['rsi'] < 30 and latest['macd'] > latest['macd_signal']:
-        signal = "Buy"
-    elif latest['rsi'] > 70 and latest['macd'] < latest['macd_signal']:
-        signal = "Sell"
-
-    # Additional signals from divergence
-    divergences = detect_rsi_divergence(df)
-    for _, div in divergences:
-        if div == 'Bullish Divergence':
-            signal = "Buy"
-        elif div == 'Bearish Divergence':
-            signal = "Sell"
-
-    return signal, divergences
-
-def main():
-    st.write(f"### DXY Index: {dxy_price:.2f} ({dxy_change:+.2f}%)")
-
-    cols = st.columns(len(symbols))
-    for i, (pair, symbol) in enumerate(symbols.items()):
-        with cols[i % len(cols)]:
-            st.markdown(f"#### {pair}")
-
-            df = fetch_candles(symbol)
-            if df.empty:
-                st.write("No data")
-                continue
-
-            signal, divergences = generate_signal(df)
-            rsi_val = calculate_rsi(df['close']).iloc[-1]
-
-            # Play alert if RSI crosses thresholds
-            if rsi_val < 30 or rsi_val > 70:
-                play_rsi_alert()
-
-            news = get_today_news_with_impact(pair)
-            st.write(f"**Signal:** {signal}")
-            st.write(f"**RSI:** {rsi_val:.1f}")
-            if divergences:
-                st.write("Divergences detected:")
-                for _, div in divergences:
-                    st.write(f"- {div}")
-            st.write("**News:**")
-            for n in news:
-                st.write(f"- {n}")
-            st.markdown("---")
-
-if __name__ == "__main__":
-    main()
+st.dataframe(style_table(df_display_sorted), height=750)
