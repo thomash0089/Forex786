@@ -177,6 +177,25 @@ def detect_trend_reversal(df):
     if e9[-2] > e20[-2] and e9[-1] < e20[-1]: return "Reversal Forming Bearish"
     return ""
 
+def detect_rsi_divergence(df):
+    close = df['close']
+    rsi = df['RSI']
+    # Use last 10 bars to look for divergence
+    local_min = close.iloc[-10:].idxmin()
+    local_max = close.iloc[-10:].idxmax()
+    recent_low = close[local_min]
+    recent_high = close[local_max]
+    recent_rsi_low = rsi[local_min]
+    recent_rsi_high = rsi[local_max]
+    current_price = close.iloc[-1]
+    current_rsi = rsi.iloc[-1]
+
+    if current_price < recent_low and current_rsi > recent_rsi_low:
+        return "Bullish Divergence"
+    elif current_price > recent_high and current_rsi < recent_rsi_high:
+        return "Bearish Divergence"
+    return ""
+
 def generate_ai_suggestion(price, indicators, atr, signal_type):
     if not indicators: return ""
     sl = price - (atr * 1.2) if signal_type == "Bullish" else price + (atr * 1.2)
@@ -224,7 +243,6 @@ for label, symbol in symbols.items():
     pattern = detect_candle_pattern(df)
     if pattern: indicators.append("Candle")
 
-    # 👉 Add RSI Divergence Info
     divergence = detect_rsi_divergence(df)
     if divergence: indicators.append(divergence)
 
@@ -238,7 +256,7 @@ for label, symbol in symbols.items():
         "Signal Type": signal_type, "Confirmed Indicators": ", ".join(indicators),
         "Candle Pattern": pattern or "—", "AI Suggestion": suggestion,
         "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None and dxy_change is not None else "—",
-        "News": get_today_news_with_impact(label)[0],
+        "News": get_next_news(label),
         "Today's News": "<br>".join(get_today_news_with_impact(label))
     })
 
@@ -247,4 +265,38 @@ column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal 
                 "DXY Impact", "News", "Today's News"]
 
 df_result = pd.DataFrame(rows)
-df_result["Score"] = df_result["AI Suggestion"].apply(lambda x: 3 if "Strong
+df_result["Score"] = df_result["AI Suggestion"].apply(lambda x: 3 if "Strong" in x else 2 if "Medium" in x else 0)
+df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
+
+styled_html = "<table style='width:100%; border-collapse: collapse;'>"
+styled_html += "<tr>" + "".join([
+    f"<th style='border:1px solid #ccc; padding:6px; background:#e0e0e0'>{col}</th>" for col in column_order]) + "</tr>"
+
+for _, row in df_sorted.iterrows():
+    style = 'background-color: #d4edda;' if "Strong" in row["AI Suggestion"] else \
+            'background-color: #d1ecf1;' if "Medium" in row["AI Suggestion"] else ''
+    styled_html += f"<tr style='{style}'>"
+    for col in column_order:
+        val = row[col]
+        if col == "Pair":
+            val = f"<strong style='font-size: 18px;'>{val}</strong>"
+        elif col == "Trend":
+            color = 'green' if row['Trend'] == 'Bullish' else 'red' if row['Trend'] == 'Bearish' else 'gray'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Trend']}</span>"
+        elif col == "Signal Type":
+            color = 'green' if row['Signal Type'] == 'Bullish' else 'red'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Signal Type']}</span>"
+        elif col == "RSI":
+            color = "red" if row["RSI"] > 75 else "green" if row["RSI"] < 20 else "black"
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['RSI']}</span>"
+        elif col == "DXY Impact" and row["DXY Impact"] != "—":
+            dxy_color = "green" if '+' in row["DXY Impact"] else "red"
+            val = f"<span style='color:{dxy_color}; font-weight:bold;'>{row['DXY Impact']}</span>"
+        styled_html += f"<td style='border:1px solid #ccc; padding:6px; white-space:pre-wrap;'>{val}</td>"
+    styled_html += "</tr>"
+
+styled_html += "</table>"
+st.markdown(styled_html, unsafe_allow_html=True)
+st.caption(f"Timeframe: 5-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.text(f"Scanned Pairs: {len(rows)}")
+st.text(f"Strong Signals Found: {len([r for r in rows if 'Strong' in r['AI Suggestion']])}")
