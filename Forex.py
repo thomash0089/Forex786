@@ -217,12 +217,16 @@ for label, symbol in symbols.items():
     signal_type = ""
     if rsi_val > 50: indicators.append("Bullish"); signal_type = "Bullish"
     elif rsi_val < 50: indicators.append("Bearish"); signal_type = "Bearish"
-    if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
-    if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
+        if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]:
+        indicators.append("MACD")
+    if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]:
+        indicators.append("EMA")
     if df["ADX"].iloc[-1] > 20:
-            indicators.append("ADX")
-        pattern = detect_candle_pattern(df)
-    if pattern: indicators.append("Candle")
+        indicators.append("ADX")
+
+    pattern = detect_candle_pattern(df)
+    if pattern:
+        indicators.append("Candle")
 
     divergence = detect_divergence(df)
     if divergence:
