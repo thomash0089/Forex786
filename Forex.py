@@ -226,9 +226,9 @@ for label, symbol in symbols.items():
 
     # 🔔 RSI Alert Trigger
     rsi_val = df["RSI"].iloc[-1]
-    if rsi_val > 70 or rsi_val < 20:
-        st.warning(f"🔔 RSI Alert for {label}: RSI = {rsi_val:.2f}")
-        play_rsi_alert()
+    #if rsi_val > 70 or rsi_val < 20:
+        #st.warning(f"🔔 RSI Alert for {label}: RSI = {rsi_val:.2f}")
+        #play_rsi_alert()
 
     indicators = []
     signal_type = ""
