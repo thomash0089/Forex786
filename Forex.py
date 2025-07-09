@@ -1,4 +1,3 @@
-# --- Forex AI Signal with RSI Sound Alert (Part 1/2) ---
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -11,6 +10,7 @@ from dateutil import parser as date_parser
 import streamlit.components.v1 as components
 import yfinance as yf
 
+# --- Streamlit UI Setup ---
 st.set_page_config(page_title="Signals", layout="wide")
 st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Signals + News</h1>", unsafe_allow_html=True)
 st_autorefresh(interval=120000, key="ai_refresh")
@@ -26,7 +26,7 @@ symbols = {
     "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
 }
 
-# --- Play Sound Alert if RSI exceeds threshold ---
+# --- Alert Sound Function ---
 def play_rsi_alert():
     components.html("""
     <audio autoplay>
@@ -39,28 +39,25 @@ def fetch_dxy_data():
     try:
         dxy = yf.Ticker("DX-Y.NYB")
         data = dxy.history(period="1d", interval="1m")
-        if data.empty:
-            raise ValueError("No data received from yfinance")
         current = data["Close"].iloc[-1]
         previous = data["Close"].iloc[0]
         change = current - previous
         percent = (change / previous) * 100
         return current, percent
-    except Exception as e:
-        print("⚠️ yfinance failed, fallback to static DXY", e)
+    except:
         dxy_price = 100.237
         dxy_previous = 100.40
         change = dxy_price - dxy_previous
         percent = (change / dxy_previous) * 100
         return dxy_price, percent
 
-# --- Fetch Forex Factory News ---
+# --- Forex Factory News ---
 def fetch_forex_factory_news():
     url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
     response = requests.get(url)
     try:
         root = ET.fromstring(response.content)
-    except ET.ParseError as e:
+    except ET.ParseError:
         return []
 
     news_data = []
@@ -79,55 +76,7 @@ def fetch_forex_factory_news():
             continue
     return news_data
 
-news_events = fetch_forex_factory_news()
-dxy_price, dxy_change = fetch_dxy_data()
-rows = []
-# --- Continued: Forex AI Signal with RSI Sound Alert (Part 2/2) ---
-
-def analyze_impact(title):
-    title = title.lower()
-    if any(x in title for x in ["cpi", "gdp", "employment", "retail", "core", "inflation", "interest rate"]):
-        if any(w in title for w in ["increase", "higher", "rises", "strong", "beats"]):
-            return "🟢 Positive"
-        elif any(w in title for w in ["decrease", "lower", "falls", "weak", "misses"]):
-            return "🔴 Negative"
-        else:
-            return "🟡 Mixed"
-    return "⚪ Neutral"
-
-def get_today_news_with_impact(pair):
-    base, quote = pair.split('/')
-    quote = quote.upper()
-    today_events = []
-    for n in news_events:
-        if n["currency"] == quote:
-            impact = analyze_impact(n["title"])
-            time_str = n["time"].strftime("%H:%M")
-            today_events.append(f"{n['title']} ({impact}) @ {time_str}")
-    return today_events or ["—"]
-
-def get_next_news(pair):
-    base, quote = pair.split('/')
-    mapping = {
-        "USD": ["USD", "United States", "US", "U.S."],
-        "EUR": ["EUR", "Eurozone", "Germany", "France"],
-        "GBP": ["GBP", "UK", "Britain", "England"],
-        "JPY": ["JPY", "Japan"],
-        "AUD": ["AUD", "Australia"],
-        "CAD": ["CAD", "Canada"],
-        "CHF": ["CHF", "Switzerland"],
-        "NZD": ["NZD", "New Zealand"],
-        "XAU": ["Gold"],
-        "XAG": ["Silver"],
-        "WTI": ["Oil", "Crude"]
-    }
-    keywords = mapping.get(base, []) + mapping.get(quote, [])
-    upcoming = [n for n in news_events if any(k.lower() in n["title"].lower() for k in keywords) and n["time"] > datetime.utcnow()]
-    if upcoming:
-        next_event = sorted(upcoming, key=lambda x: x["time"])[0]
-        return f"{next_event['title']} @ {next_event['time'].strftime('%H:%M')}"
-    return "—"
-
+# --- Technical Indicator Calculations ---
 def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = delta.where(delta > 0, 0)
@@ -194,15 +143,17 @@ def generate_ai_suggestion(price, indicators, atr, signal_type):
     sl = price - (atr * 1.2) if signal_type == "Bullish" else price + (atr * 1.2)
     tp = price + (atr * 2.5) if signal_type == "Bullish" else price - (atr * 2.5)
     count = len(indicators)
-    if count >= 4:
-        conf = "Strong"
-    elif count == 3:
-        conf = "Medium"
-    else:
-        return ""
+    if count >= 4: conf = "Strong"
+    elif count == 3: conf = "Medium"
+    else: return ""
     color = "green" if signal_type == "Bullish" else "red"
     signal_txt = f"{conf} <span style='color:{color}'>{signal_type}</span> Signal @ {price:.5f}"
     return f"{signal_txt} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {conf}"
+
+# --- Fetch and Analyze Symbols ---
+news_events = fetch_forex_factory_news()
+dxy_price, dxy_change = fetch_dxy_data()
+rows = []
 
 for label, symbol in symbols.items():
     url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=5min&outputsize=200&apikey={API_KEY}"
@@ -222,20 +173,14 @@ for label, symbol in symbols.items():
 
     price = df["close"].iloc[-1]
     atr = df["ATR"].iloc[-1]
-    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
-
-    # 🔔 RSI Alert Trigger
     rsi_val = df["RSI"].iloc[-1]
-    #if rsi_val > 70 or rsi_val < 20:
-        #st.warning(f"🔔 RSI Alert for {label}: RSI = {rsi_val:.2f}")
-        #play_rsi_alert()
+    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else \
+            "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
 
     indicators = []
     signal_type = ""
-    if rsi_val > 50:
-        indicators.append("Bullish"); signal_type = "Bullish"
-    elif rsi_val < 50:
-        indicators.append("Bearish"); signal_type = "Bearish"
+    if rsi_val > 50: indicators.append("Bullish"); signal_type = "Bullish"
+    elif rsi_val < 50: indicators.append("Bearish"); signal_type = "Bearish"
     if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
     if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
     if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
@@ -246,70 +191,25 @@ for label, symbol in symbols.items():
     if not suggestion: continue
 
     rows.append({
-    "Pair": label,
-    "Price": round(price, 5),
-    "RSI 5M": round(rsi_val, 2),
-    "RSI 15 M": "—",
-    "RSI 1H": "—",
-    "RSI 4H": "—",
-    "ATR": round(atr, 5),
-    "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
-    "Trend 5m": trend,
-    "Trend Daily": "—",
-    "Reversal Signal": detect_trend_reversal(df),
-    "Signal Type": signal_type,
-    "Confirmed Indicators": ", ".join(indicators),
-    "Candle Pattern": pattern or "—",
-    "AI Suggestion": suggestion,
-    "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None and dxy_change is not None else "—"
-})
+        "Pair": label,
+        "Price": round(price, 5),
+        "RSI 5M": round(rsi_val, 2),
+        "ATR": round(atr, 5),
+        "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
+        "Trend 5m": trend,
+        "Reversal Signal": detect_trend_reversal(df),
+        "Signal Type": signal_type,
+        "Confirmed Indicators": ", ".join(indicators),
+        "Candle Pattern": pattern or "—",
+        "AI Suggestion": suggestion,
+        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label else "—"
+    })
 
-column_order = ["Pair", "Price", "RSI 5M", "RSI 15 M", "RSI 1H", "RSI 4H", "ATR", "ATR Status", "Trend 5m", "Trend Daily", "Reversal Signal",
-                "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion",
-                "DXY Impact", ]
-
+# --- Display Results ---
 df_result = pd.DataFrame(rows)
-
-# Make sure all columns in column_order exist in df_result
-for col in column_order:
-    if col not in df_result.columns:
-        df_result[col] = "—"
-
-# Reorder the columns
-df_result = df_result[column_order]
-
 df_result["Score"] = df_result["AI Suggestion"].apply(lambda x: 3 if "Strong" in x else 2 if "Medium" in x else 0)
 df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
-
-styled_html = "<table style='width:100%; border-collapse: collapse;'>"
-styled_html += "<tr>" + "".join([
-    f"<th style='border:1px solid #ccc; padding:6px; background:#e0e0e0'>{col}</th>" for col in column_order]) + "</tr>"
-
-for _, row in df_sorted.iterrows():
-    style = 'background-color: #d4edda;' if "Strong" in row["AI Suggestion"] else \
-            'background-color: #d1ecf1;' if "Medium" in row["AI Suggestion"] else ''
-    styled_html += f"<tr style='{style}'>"
-    for col in column_order:
-        val = row[col]
-        if col == "Pair":
-            val = f"<strong style='font-size: 18px;'>{val}</strong>"
-        elif col == "Trend":
-            color = 'green' if row['Trend'] == 'Bullish' else 'red' if row['Trend'] == 'Bearish' else 'gray'
-            val = f"<span style='color:{color}; font-weight:bold;'>{row['Trend']}</span>"
-        elif col == "Signal Type":
-            color = 'green' if row['Signal Type'] == 'Bullish' else 'red'
-            val = f"<span style='color:{color}; font-weight:bold;'>{row['Signal Type']}</span>"
-        elif col == "RSI":
-            color = "red" if row["RSI"] > 75 else "green" if row["RSI"] < 20 else "black"
-            val = f"<span style='color:{color}; font-weight:bold;'>{row['RSI']}</span>"
-        elif col == "DXY Impact" and row["DXY Impact"] != "—":
-            dxy_color = "green" if '+' in row["DXY Impact"] else "red"
-            val = f"<span style='color:{dxy_color}; font-weight:bold;'>{row['DXY Impact']}</span>"
-        styled_html += f"<td style='border:1px solid #ccc; padding:6px; white-space:pre-wrap;'>{val}</td>"
-    styled_html += "</tr>"
-
-styled_html += "</table>"
-st.markdown(styled_html, unsafe_allow_html=True)
+st.dataframe(df_sorted, use_container_width=True)
 st.caption(f"Timeframe: 5-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 st.text(f"Scanned Pairs: {len(rows)}")
 st.text(f"Strong Signals Found: {len([r for r in rows if 'Strong' in r['AI Suggestion']])}")
