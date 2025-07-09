@@ -228,7 +228,8 @@ if divergence:
     play_rsi_alert()  # 🔔 Alert on divergence detection
 
     suggestion = generate_ai_suggestion(price, indicators, atr, signal_type)
-    if not suggestion: continue
+    if not suggestion:
+        continue
 
     rows.append({
         "Pair": label, "Price": round(price, 5), "RSI": round(rsi_val, 2),
