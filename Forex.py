@@ -1,4 +1,4 @@
-# --- My Signal with Divergence
+# --- My Signal
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -37,20 +37,26 @@ def fetch_dxy_data():
     try:
         dxy = yf.Ticker("DX-Y.NYB")
         data = dxy.history(period="1d", interval="1m")
+        if data.empty:
+            raise ValueError("No data received from yfinance")
         current = data["Close"].iloc[-1]
         previous = data["Close"].iloc[0]
         change = current - previous
         percent = (change / previous) * 100
         return current, percent
-    except:
-        return 100.237, -0.16
+    except Exception as e:
+        dxy_price = 100.237
+        dxy_previous = 100.40
+        change = dxy_price - dxy_previous
+        percent = (change / dxy_previous) * 100
+        return dxy_price, percent
 
 def fetch_forex_factory_news():
     url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
     response = requests.get(url)
     try:
         root = ET.fromstring(response.content)
-    except:
+    except ET.ParseError as e:
         return []
 
     news_data = []
@@ -60,10 +66,36 @@ def fetch_forex_factory_news():
             pub_time = date_parser.parse(item.find("pubDate").text)
             currency = item.find("{http://www.forexfactory.com/rss}currency").text.strip().upper()
             if pub_time.date() == datetime.utcnow().date():
-                news_data.append({"title": title, "time": pub_time, "currency": currency})
+                news_data.append({
+                    "title": title,
+                    "time": pub_time,
+                    "currency": currency
+                })
         except:
             continue
     return news_data
+
+def analyze_impact(title):
+    title = title.lower()
+    if any(x in title for x in ["cpi", "gdp", "employment", "retail", "core", "inflation", "interest rate"]):
+        if any(w in title for w in ["increase", "higher", "rises", "strong", "beats"]):
+            return "🟢 Positive"
+        elif any(w in title for w in ["decrease", "lower", "falls", "weak", "misses"]):
+            return "🔴 Negative"
+        else:
+            return "🟡 Mixed"
+    return "⚪ Neutral"
+
+def get_today_news_with_impact(pair):
+    base, quote = pair.split('/')
+    quote = quote.upper()
+    today_events = []
+    for n in news_events:
+        if n["currency"] == quote:
+            impact = analyze_impact(n["title"])
+            time_str = n["time"].strftime("%H:%M")
+            today_events.append(f"{n['title']} ({impact}) @ {time_str}")
+    return today_events or ["—"]
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -92,9 +124,12 @@ def calculate_atr(df, period=14):
     return tr.rolling(window=period).mean()
 
 def calculate_adx(df, period=14):
-    df['TR'] = np.maximum(df['high'] - df['low'], np.maximum(abs(df['high'] - df['close'].shift()), abs(df['low'] - df['close'].shift())))
-    df['+DM'] = np.where((df['high'] - df['high'].shift()) > (df['low'].shift() - df['low']), np.maximum(df['high'] - df['high'].shift(), 0), 0)
-    df['-DM'] = np.where((df['low'].shift() - df['low']) > (df['high'] - df['high'].shift()), np.maximum(df['low'].shift() - df['low'], 0), 0)
+    df['TR'] = np.maximum(df['high'] - df['low'],
+                          np.maximum(abs(df['high'] - df['close'].shift()), abs(df['low'] - df['close'].shift())))
+    df['+DM'] = np.where((df['high'] - df['high'].shift()) > (df['low'].shift() - df['low']),
+                         np.maximum(df['high'] - df['high'].shift(), 0), 0)
+    df['-DM'] = np.where((df['low'].shift() - df['low']) > (df['high'] - df['high'].shift()),
+                         np.maximum(df['low'].shift() - df['low'], 0), 0)
     tr14 = df['TR'].rolling(window=period).mean()
     plus_dm14 = df['+DM'].rolling(window=period).mean()
     minus_dm14 = df['-DM'].rolling(window=period).mean()
@@ -124,15 +159,20 @@ def detect_trend_reversal(df):
     return ""
 
 def detect_divergence(df):
-    if 'RSI' not in df or df['RSI'].isnull().all():
-        return "None"
-    price_change = df['close'].diff()
-    rsi_change = df['RSI'].diff()
-    if price_change.iloc[-1] > 0 and rsi_change.iloc[-1] < 0:
-        return "Bearish Divergence"
-    elif price_change.iloc[-1] < 0 and rsi_change.iloc[-1] > 0:
+    closes = df['close']
+    rsis = df['RSI']
+    if len(closes) < 10 or len(rsis) < 10:
+        return ""
+    recent_price_low = closes.iloc[-5:].idxmin()
+    recent_price_high = closes.iloc[-5:].idxmax()
+    recent_rsi_low = rsis.iloc[-5:].idxmin()
+    recent_rsi_high = rsis.iloc[-5:].idxmax()
+
+    if recent_price_low != recent_rsi_low and closes[recent_price_low] < closes[-1] and rsis[recent_rsi_low] > rsis[-1]:
         return "Bullish Divergence"
-    return "None"
+    if recent_price_high != recent_rsi_high and closes[recent_price_high] > closes[-1] and rsis[recent_rsi_high] < rsis[-1]:
+        return "Bearish Divergence"
+    return ""
 
 def generate_ai_suggestion(price, indicators, atr, signal_type):
     if not indicators: return ""
@@ -174,6 +214,7 @@ for label, symbol in symbols.items():
     trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
 
     rsi_val = df["RSI"].iloc[-1]
+
     indicators = []
     signal_type = ""
     if rsi_val > 50:
@@ -185,8 +226,9 @@ for label, symbol in symbols.items():
     if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
     pattern = detect_candle_pattern(df)
     if pattern: indicators.append("Candle")
-
     divergence = detect_divergence(df)
+    if divergence: indicators.append("Divergence")
+
     suggestion = generate_ai_suggestion(price, indicators, atr, signal_type)
     if not suggestion: continue
 
@@ -195,12 +237,12 @@ for label, symbol in symbols.items():
         "ATR": round(atr, 5), "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
         "Trend": trend, "Reversal Signal": detect_trend_reversal(df),
         "Signal Type": signal_type, "Confirmed Indicators": ", ".join(indicators),
-        "Candle Pattern": pattern or "—", "Divergence": divergence, "AI Suggestion": suggestion,
-        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label else "—"
+        "Candle Pattern": pattern or "—", "AI Suggestion": suggestion,
+        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None else "—"
     })
 
 column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
-                "Signal Type", "Confirmed Indicators", "Candle Pattern", "Divergence", "AI Suggestion",
+                "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion",
                 "DXY Impact"]
 
 df_result = pd.DataFrame(rows)
@@ -217,6 +259,20 @@ for _, row in df_sorted.iterrows():
     styled_html += f"<tr style='{style}'>"
     for col in column_order:
         val = row[col]
+        if col == "Pair":
+            val = f"<strong style='font-size: 18px;'>{val}</strong>"
+        elif col == "Trend":
+            color = 'green' if row['Trend'] == 'Bullish' else 'red' if row['Trend'] == 'Bearish' else 'gray'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Trend']}</span>"
+        elif col == "Signal Type":
+            color = 'green' if row['Signal Type'] == 'Bullish' else 'red'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Signal Type']}</span>"
+        elif col == "RSI":
+            color = "red" if row["RSI"] > 75 else "green" if row["RSI"] < 20 else "black"
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['RSI']}</span>"
+        elif col == "DXY Impact" and row["DXY Impact"] != "—":
+            dxy_color = "green" if '+' in row["DXY Impact"] else "red"
+            val = f"<span style='color:{dxy_color}; font-weight:bold;'>{row['DXY Impact']}</span>"
         styled_html += f"<td style='border:1px solid #ccc; padding:6px; white-space:pre-wrap;'>{val}</td>"
     styled_html += "</tr>"
 
