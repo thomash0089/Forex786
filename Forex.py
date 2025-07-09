@@ -244,4 +244,4 @@ for label, symbol in symbols.items():
         "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None else "—",
         "Divergence": divergence or "—"
     })
-
+# Remaining Streamlit rendering logic goes here...
