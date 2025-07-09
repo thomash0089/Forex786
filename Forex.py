@@ -5,7 +5,6 @@ import pandas as pd
 import requests
 import numpy as np
 from datetime import datetime
-from pytz import timezone
 import xml.etree.ElementTree as ET
 from dateutil import parser as date_parser
 import streamlit.components.v1 as components
@@ -17,13 +16,10 @@ st_autorefresh(interval=120000, key="ai_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
 
+# Keep fewer symbols for testing
 symbols = {
-    "EUR/USD": "EUR/USD", "GBP/USD": "GBP/USD", "USD/JPY": "USD/JPY",
-    "AUD/USD": "AUD/USD", "USD/CAD": "USD/CAD", "USD/CHF": "USD/CHF",
-    "XAU/USD": "XAU/USD", "WTI/USD": "WTI/USD", "EUR/JPY": "EUR/JPY", "NZD/USD": "NZD/USD",
-    "EUR/GBP": "EUR/GBP", "EUR/CAD": "EUR/CAD", "GBP/JPY": "GBP/JPY",
-    "EUR/AUD": "EUR/AUD", "AUD/JPY": "AUD/JPY", "GBP/NZD": "GBP/NZD",
-    "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
+    "EUR/USD": "EUR/USD",
+    "GBP/USD": "GBP/USD"
 }
 
 def play_rsi_alert():
@@ -37,26 +33,20 @@ def fetch_dxy_data():
     try:
         dxy = yf.Ticker("DX-Y.NYB")
         data = dxy.history(period="1d", interval="1m")
-        if data.empty:
-            raise ValueError("No data received from yfinance")
         current = data["Close"].iloc[-1]
         previous = data["Close"].iloc[0]
         change = current - previous
         percent = (change / previous) * 100
         return current, percent
-    except Exception as e:
-        dxy_price = 100.237
-        dxy_previous = 100.40
-        change = dxy_price - dxy_previous
-        percent = (change / dxy_previous) * 100
-        return dxy_price, percent
+    except:
+        return None, None
 
 def fetch_forex_factory_news():
     url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
     response = requests.get(url)
     try:
         root = ET.fromstring(response.content)
-    except ET.ParseError as e:
+    except ET.ParseError:
         return []
 
     news_data = []
@@ -186,6 +176,7 @@ for label, symbol in symbols.items():
     url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=5min&outputsize=200&apikey={API_KEY}"
     r = requests.get(url).json()
     if "values" not in r:
+        st.error(f"No data for {label}: {r.get('message', 'Unknown error')}")
         continue
 
     df = pd.DataFrame(r["values"])
@@ -202,25 +193,24 @@ for label, symbol in symbols.items():
 
     price = df["close"].iloc[-1]
     atr = df["ATR"].iloc[-1]
-    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
     rsi_val = df["RSI"].iloc[-1]
+
     indicators = []
     signal_type = ""
+
     if rsi_val > 50:
         indicators.append("Bullish")
         signal_type = "Bullish"
     elif rsi_val < 50:
         indicators.append("Bearish")
         signal_type = "Bearish"
-    if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]:
-        indicators.append("MACD")
-    if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]:
-        indicators.append("EMA")
-    if df["ADX"].iloc[-1] > 20:
-        indicators.append("ADX")
+
+    if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
+    if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
+    if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
+
     pattern = detect_candle_pattern(df)
-    if pattern:
-        indicators.append("Candle")
+    if pattern: indicators.append("Candle")
 
     divergence = detect_divergence(df)
     if divergence:
@@ -234,14 +224,16 @@ for label, symbol in symbols.items():
         "Price": round(price, 5),
         "RSI": round(rsi_val, 2),
         "ATR": round(atr, 5),
-        "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
-        "Trend": trend,
-        "Reversal Signal": detect_trend_reversal(df),
-        "Signal Type": signal_type,
-        "Confirmed Indicators": ", ".join(indicators),
+        "Trend": signal_type,
+        "Indicators": ", ".join(indicators),
         "Candle Pattern": pattern or "—",
-        "AI Suggestion": suggestion,
-        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None else "—",
-        "Divergence": divergence or "—"
+        "Divergence": divergence or "—",
+        "AI Suggestion": suggestion
     })
-# Remaining Streamlit rendering logic goes here...
+
+# 🟢 Display Table
+if rows:
+    df_result = pd.DataFrame(rows)
+    st.dataframe(df_result)
+else:
+    st.warning("⚠️ No signals to display. Try again later or check API limits.")
