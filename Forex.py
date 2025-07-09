@@ -1,4 +1,4 @@
-# --- Forex AI Signal with RSI Sound Alert (Part 1/2) ---
+# --- My Signal
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 import yfinance as yf
 
 st.set_page_config(page_title="Signals", layout="wide")
-st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 Signals + News</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align:center; color:#007acc;'>📊 My Signal</h1>", unsafe_allow_html=True)
 st_autorefresh(interval=120000, key="ai_refresh")
 
 API_KEY = "b2a1234a9ea240f9ba85696e2a243403"
@@ -26,6 +26,7 @@ symbols = {
     "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
 }
 
+# --- Play Sound Alert if RSI exceeds threshold ---
 def play_rsi_alert():
     components.html("""
     <audio autoplay>
@@ -33,6 +34,7 @@ def play_rsi_alert():
     </audio>
     """, height=0)
 
+# --- Fetch DXY Data ---
 def fetch_dxy_data():
     try:
         dxy = yf.Ticker("DX-Y.NYB")
@@ -45,18 +47,20 @@ def fetch_dxy_data():
         percent = (change / previous) * 100
         return current, percent
     except Exception as e:
+        print("⚠️ yfinance failed, fallback to static DXY", e)
         dxy_price = 100.237
         dxy_previous = 100.40
         change = dxy_price - dxy_previous
         percent = (change / dxy_previous) * 100
         return dxy_price, percent
 
+# --- Fetch Forex Factory News ---
 def fetch_forex_factory_news():
     url = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
+    response = requests.get(url)
     try:
-        response = requests.get(url)
         root = ET.fromstring(response.content)
-    except:
+    except ET.ParseError as e:
         return []
 
     news_data = []
@@ -75,6 +79,11 @@ def fetch_forex_factory_news():
             continue
     return news_data
 
+news_events = fetch_forex_factory_news()
+dxy_price, dxy_change = fetch_dxy_data()
+rows = []
+# --- Continued: Forex AI Signal with RSI Sound Alert (Part 2/2) ---
+
 def analyze_impact(title):
     title = title.lower()
     if any(x in title for x in ["cpi", "gdp", "employment", "retail", "core", "inflation", "interest rate"]):
@@ -88,6 +97,7 @@ def analyze_impact(title):
 
 def get_today_news_with_impact(pair):
     base, quote = pair.split('/')
+    quote = quote.upper()
     today_events = []
     for n in news_events:
         if n["currency"] == quote:
@@ -158,116 +168,129 @@ def calculate_adx(df, period=14):
     minus_di14 = 100 * (minus_dm14 / tr14)
     dx = 100 * abs(plus_di14 - minus_di14) / (plus_di14 + minus_di14)
     return dx.rolling(window=period).mean()
-# --- Forex AI Signal with RSI Sound Alert (Part 2/2) ---
 
-def detect_candle_reversal(df):
-    body = abs(df['close'] - df['open'])
-    range_ = df['high'] - df['low']
-    upper_wick = df['high'] - df[['open', 'close']].max(axis=1)
-    lower_wick = df[['open', 'close']].min(axis=1) - df['low']
-    long_tail = lower_wick > (2 * body)
-    pinbar = (long_tail) & (upper_wick < body)
-    engulfing = (df['close'] > df['open'].shift(1)) & (df['open'] < df['close'].shift(1))
-    reversal = pinbar | engulfing
-    return reversal.shift().fillna(False)
+def detect_candle_pattern(df):
+    o, c, h, l = df['open'].iloc[-2:], df['close'].iloc[-2:], df['high'].iloc[-2:], df['low'].iloc[-2:]
+    co, cc, ch, cl = o.iloc[-1], c.iloc[-1], h.iloc[-1], l.iloc[-1]
+    po, pc = o.iloc[-2], c.iloc[-2]
+    body, range_ = abs(cc - co), ch - cl
+    if body < range_ * 0.1: return "Doji"
+    if pc < po and cc > co and cc > po and co < pc: return "Bullish Engulfing"
+    if pc > po and cc < co and cc < po and co > pc: return "Bearish Engulfing"
+    if body < range_ * 0.3 and cl < co and cl < cc and (ch - max(co, cc)) < body: return "Hammer"
+    if body < range_ * 0.3 and ch > co and ch > cc and (min(co, cc) - cl) < body: return "Shooting Star"
+    return ""
 
-def fetch_forex_data(pair):
-    try:
-        url = f"https://api.twelvedata.com/time_series?symbol={pair}&interval=5min&outputsize=100&apikey={API_KEY}"
-        response = requests.get(url).json()
-        df = pd.DataFrame(response["values"])
-        df.columns = df.columns.str.lower()
-        df = df.rename(columns={"datetime": "time"})
-        df["time"] = pd.to_datetime(df["time"])
-        df = df.sort_values("time")
-        df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].astype(float)
-        return df
-    except:
-        return pd.DataFrame()
+def detect_trend_reversal(df):
+    e9, e20 = df['EMA9'].iloc[-3:], df['EMA20'].iloc[-3:]
+    if e9[0] < e20[0] and e9[1] > e20[1] and e9[2] > e20[2]: return "Reversal Confirmed Bullish"
+    if e9[0] > e20[0] and e9[1] < e20[1] and e9[2] < e20[2]: return "Reversal Confirmed Bearish"
+    if e9[-2] < e20[-2] and e9[-1] > e20[-1]: return "Reversal Forming Bullish"
+    if e9[-2] > e20[-2] and e9[-1] < e20[-1]: return "Reversal Forming Bearish"
+    return ""
 
-def compute_signal(df):
-    df['rsi'] = calculate_rsi(df['close'])
-    macd, signal = calculate_macd(df['close'])
-    df['macd'] = macd
-    df['macd_signal'] = signal
-    df['ema_20'] = calculate_ema(df['close'], 20)
-    df['ema_50'] = calculate_ema(df['close'], 50)
-    df['ema_200'] = calculate_ema(df['close'], 200)
-    df['adx'] = calculate_adx(df.copy())
+def generate_ai_suggestion(price, indicators, atr, signal_type):
+    if not indicators: return ""
+    sl = price - (atr * 1.2) if signal_type == "Bullish" else price + (atr * 1.2)
+    tp = price + (atr * 2.5) if signal_type == "Bullish" else price - (atr * 2.5)
+    count = len(indicators)
+    if count >= 4:
+        conf = "Strong"
+    elif count == 3:
+        conf = "Medium"
+    else:
+        return ""
+    color = "green" if signal_type == "Bullish" else "red"
+    signal_txt = f"{conf} <span style='color:{color}'>{signal_type}</span> Signal @ {price:.5f}"
+    return f"{signal_txt} | SL: {sl:.5f} | TP: {tp:.5f} | Confidence: {conf}"
 
-    latest = df.iloc[-1]
-    previous = df.iloc[-2]
+for label, symbol in symbols.items():
+    url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=5min&outputsize=200&apikey={API_KEY}"
+    r = requests.get(url).json()
+    if "values" not in r: continue
+    df = pd.DataFrame(r["values"])
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df.set_index("datetime", inplace=True)
+    df = df.astype(float).sort_index()
+    df["RSI"] = calculate_rsi(df["close"])
+    df["MACD"], df["MACD_Signal"] = calculate_macd(df["close"])
+    df["EMA9"] = calculate_ema(df["close"], 9)
+    df["EMA20"] = calculate_ema(df["close"], 20)
+    df["ADX"] = calculate_adx(df)
+    df["ATR"] = calculate_atr(df)
+    df.dropna(inplace=True)
 
-    score = 0
-    reasons = []
+    price = df["close"].iloc[-1]
+    atr = df["ATR"].iloc[-1]
+    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
 
-    # RSI Signals
-    if latest['rsi'] < 30:
-        score += 2
-        reasons.append("RSI Oversold")
-        play_rsi_alert()
-    elif latest['rsi'] > 70:
-        score -= 2
-        reasons.append("RSI Overbought")
-        play_rsi_alert()
+    # 🔔 RSI Alert Trigger
+    rsi_val = df["RSI"].iloc[-1]
+    #if rsi_val > 70 or rsi_val < 20:
+        #st.warning(f"🔔 RSI Alert for {label}: RSI = {rsi_val:.2f}")
+        #play_rsi_alert()
 
-    # MACD
-    if latest['macd'] > latest['macd_signal'] and previous['macd'] < previous['macd_signal']:
-        score += 1
-        reasons.append("MACD Bullish Cross")
-    elif latest['macd'] < latest['macd_signal'] and previous['macd'] > previous['macd_signal']:
-        score -= 1
-        reasons.append("MACD Bearish Cross")
+    indicators = []
+    signal_type = ""
+    if rsi_val > 50:
+        indicators.append("Bullish"); signal_type = "Bullish"
+    elif rsi_val < 50:
+        indicators.append("Bearish"); signal_type = "Bearish"
+    if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
+    if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
+    if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
+    pattern = detect_candle_pattern(df)
+    if pattern: indicators.append("Candle")
 
-    # EMA trend
-    if latest['ema_20'] > latest['ema_50'] > latest['ema_200']:
-        score += 1
-        reasons.append("EMA Bullish Alignment")
-    elif latest['ema_20'] < latest['ema_50'] < latest['ema_200']:
-        score -= 1
-        reasons.append("EMA Bearish Alignment")
+    suggestion = generate_ai_suggestion(price, indicators, atr, signal_type)
+    if not suggestion: continue
 
-    # ADX
-    if latest['adx'] > 25:
-        score += 1
-        reasons.append("Strong Trend (ADX)")
+    rows.append({
+    "Pair": label, "Price": round(price, 5), "RSI": round(rsi_val, 2),
+    "ATR": round(atr, 5), "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
+    "Trend": trend, "Reversal Signal": detect_trend_reversal(df),
+    "Signal Type": signal_type, "Confirmed Indicators": ", ".join(indicators),
+    "Candle Pattern": pattern or "—", "AI Suggestion": suggestion,
+    "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None and dxy_change is not None else "—"
+})
 
-    # Reversal
-    reversal = detect_candle_reversal(df)
-    if reversal.iloc[-1]:
-        score += 2
-        reasons.append("Candle Reversal")
+column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
+                "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion",
+                "DXY Impact", ]
 
-    signal = "🟢 Buy" if score >= 3 else "🔴 Sell" if score <= -3 else "⚪ Hold"
-    return signal, reasons, latest['rsi']
+df_result = pd.DataFrame(rows)
+df_result["Score"] = df_result["AI Suggestion"].apply(lambda x: 3 if "Strong" in x else 2 if "Medium" in x else 0)
+df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
 
-# Fetch all news only once
-news_events = fetch_forex_factory_news()
+styled_html = "<table style='width:100%; border-collapse: collapse;'>"
+styled_html += "<tr>" + "".join([
+    f"<th style='border:1px solid #ccc; padding:6px; background:#e0e0e0'>{col}</th>" for col in column_order]) + "</tr>"
 
-# Display DXY
-dxy, dxy_change = fetch_dxy_data()
-dxy_col = st.columns(1)[0]
-dxy_col.metric("💵 DXY Index", f"{dxy:.2f}", f"{dxy_change:.2f}%")
+for _, row in df_sorted.iterrows():
+    style = 'background-color: #d4edda;' if "Strong" in row["AI Suggestion"] else \
+            'background-color: #d1ecf1;' if "Medium" in row["AI Suggestion"] else ''
+    styled_html += f"<tr style='{style}'>"
+    for col in column_order:
+        val = row[col]
+        if col == "Pair":
+            val = f"<strong style='font-size: 18px;'>{val}</strong>"
+        elif col == "Trend":
+            color = 'green' if row['Trend'] == 'Bullish' else 'red' if row['Trend'] == 'Bearish' else 'gray'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Trend']}</span>"
+        elif col == "Signal Type":
+            color = 'green' if row['Signal Type'] == 'Bullish' else 'red'
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['Signal Type']}</span>"
+        elif col == "RSI":
+            color = "red" if row["RSI"] > 75 else "green" if row["RSI"] < 20 else "black"
+            val = f"<span style='color:{color}; font-weight:bold;'>{row['RSI']}</span>"
+        elif col == "DXY Impact" and row["DXY Impact"] != "—":
+            dxy_color = "green" if '+' in row["DXY Impact"] else "red"
+            val = f"<span style='color:{dxy_color}; font-weight:bold;'>{row['DXY Impact']}</span>"
+        styled_html += f"<td style='border:1px solid #ccc; padding:6px; white-space:pre-wrap;'>{val}</td>"
+    styled_html += "</tr>"
 
-# Signal Grid
-cols = st.columns(4)
-for idx, (symbol, name) in enumerate(symbols.items()):
-    df = fetch_forex_data(symbol.replace("/", ""))
-    if df.empty:
-        continue
-
-    signal, reasons, rsi = compute_signal(df)
-    next_news = get_next_news(symbol)
-    today_news = get_today_news_with_impact(symbol)
-
-    with cols[idx % 4]:
-        st.subheader(f"📈 {symbol}")
-        st.metric("📍 Signal", signal)
-        st.text(f"RSI: {rsi:.1f}")
-        st.text("Reasons:")
-        for r in reasons:
-            st.markdown(f"- {r}")
-        st.text("📅 Today News:")
-        for event in today_news:
-            st.markdown(f"- {event}")
-        st.markdown(f"⏳ Next: {next_news}")
+styled_html += "</table>"
+st.markdown(styled_html, unsafe_allow_html=True)
+st.caption(f"Timeframe: 5-Min | Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.text(f"Scanned Pairs: {len(rows)}")
+st.text(f"Strong Signals Found: {len([r for r in rows if 'Strong' in r['AI Suggestion']])}")
