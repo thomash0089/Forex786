@@ -223,7 +223,7 @@ for label, symbol in symbols.items():
     pattern = detect_candle_pattern(df)
     if pattern: indicators.append("Candle")
     divergence = detect_divergence(df)
-    if divergence:
+if divergence:
     indicators.append("Divergence")
     play_rsi_alert()  # 🔔 Alert on divergence detection
 
