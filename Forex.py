@@ -229,7 +229,8 @@ if divergence:
 
     suggestion = generate_ai_suggestion(price, indicators, atr, signal_type)
     if not suggestion:
-        continue
+        continue  # <- ✅ this is only valid inside this loop
+    ...
 
     rows.append({
         "Pair": label, "Price": round(price, 5), "RSI": round(rsi_val, 2),
