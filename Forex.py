@@ -226,9 +226,9 @@ for label, symbol in symbols.items():
 
     # 🔔 RSI Alert Trigger
     rsi_val = df["RSI"].iloc[-1]
-    #if rsi_val > 70 or rsi_val < 20:
-        #st.warning(f"🔔 RSI Alert for {label}: RSI = {rsi_val:.2f}")
-        #play_rsi_alert()
+    if rsi_val > 70 or rsi_val < 20:
+        st.warning(f"🔔 RSI Alert for {label}: RSI = {rsi_val:.2f}")
+        play_rsi_alert()
 
     indicators = []
     signal_type = ""
@@ -246,38 +246,21 @@ for label, symbol in symbols.items():
     if not suggestion: continue
 
     rows.append({
-    "Pair": label,
-    "Price": round(price, 5),
-    "RSI 5M": round(rsi_val, 2),
-    "RSI 15 M": "—",
-    "RSI 1H": "—",
-    "RSI 4H": "—",
-    "ATR": round(atr, 5),
-    "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
-    "Trend 5m": trend,
-    "Trend Daily": "—",
-    "Reversal Signal": detect_trend_reversal(df),
-    "Signal Type": signal_type,
-    "Confirmed Indicators": ", ".join(indicators),
-    "Candle Pattern": pattern or "—",
-    "AI Suggestion": suggestion,
-    "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None and dxy_change is not None else "—"
-})
+        "Pair": label, "Price": round(price, 5), "RSI": round(rsi_val, 2),
+        "ATR": round(atr, 5), "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
+        "Trend": trend, "Reversal Signal": detect_trend_reversal(df),
+        "Signal Type": signal_type, "Confirmed Indicators": ", ".join(indicators),
+        "Candle Pattern": pattern or "—", "AI Suggestion": suggestion,
+        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None and dxy_change is not None else "—",
+        "News": get_next_news(label),
+        "Today's News": "<br>".join(get_today_news_with_impact(label))
+    })
 
-column_order = ["Pair", "Price", "RSI 5M", "RSI 15 M", "RSI 1H", "RSI 4H", "ATR", "ATR Status", "Trend 5m", "Trend Daily", "Reversal Signal",
+column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
                 "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion",
-                "DXY Impact", ]
+                "DXY Impact", "News", "Today's News"]
 
 df_result = pd.DataFrame(rows)
-
-# Make sure all columns in column_order exist in df_result
-for col in column_order:
-    if col not in df_result.columns:
-        df_result[col] = "—"
-
-# Reorder the columns
-df_result = df_result[column_order]
-
 df_result["Score"] = df_result["AI Suggestion"].apply(lambda x: 3 if "Strong" in x else 2 if "Medium" in x else 0)
 df_sorted = df_result.sort_values(by="Score", ascending=False).drop(columns=["Score"])
 
