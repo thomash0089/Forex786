@@ -196,7 +196,9 @@ rows = []
 for label, symbol in symbols.items():
     url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=5min&outputsize=200&apikey={API_KEY}"
     r = requests.get(url).json()
-    if "values" not in r: continue
+    if "values" not in r:
+        continue
+
     df = pd.DataFrame(r["values"])
     df["datetime"] = pd.to_datetime(df["datetime"])
     df.set_index("datetime", inplace=True)
@@ -211,13 +213,21 @@ for label, symbol in symbols.items():
 
     price = df["close"].iloc[-1]
     atr = df["ATR"].iloc[-1]
-    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
+    trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else \
+            "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
+
     rsi_val = df["RSI"].iloc[-1]
     indicators = []
     signal_type = ""
-    if rsi_val > 50: indicators.append("Bullish"); signal_type = "Bullish"
-    elif rsi_val < 50: indicators.append("Bearish"); signal_type = "Bearish"
-        if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]:
+
+    if rsi_val > 50:
+        indicators.append("Bullish")
+        signal_type = "Bullish"
+    elif rsi_val < 50:
+        indicators.append("Bearish")
+        signal_type = "Bearish"
+
+    if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]:
         indicators.append("MACD")
     if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]:
         indicators.append("EMA")
@@ -233,6 +243,8 @@ for label, symbol in symbols.items():
         indicators.append("Divergence")
         play_rsi_alert()
 
+    suggestion = generate_ai_suggestion(price, indicators, atr, signal_type)
+
     rows.append({
         "Pair": label, "Price": round(price, 5), "RSI": round(rsi_val, 2),
         "ATR": round(atr, 5), "ATR Status": "🔴 Low" if atr < 0.0004 else "🟡 Normal" if atr < 0.0009 else "🟢 High",
@@ -242,7 +254,6 @@ for label, symbol in symbols.items():
         "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None else "—",
         "Divergence": divergence or "—"
     })
-
 column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
                 "Signal Type", "Confirmed Indicators", "Candle Pattern", "Divergence", "AI Suggestion",
                 "DXY Impact"]
