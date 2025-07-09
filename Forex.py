@@ -26,14 +26,6 @@ symbols = {
     "EUR/NZD": "EUR/NZD", "XAG/USD": "XAG/USD",
 }
 
-# --- Play Sound Alert if RSI exceeds threshold ---
-def play_rsi_alert():
-    components.html("""
-    <audio autoplay>
-        <source src="https://www.soundjay.com/button/beep-07.wav" type="audio/wav">
-    </audio>
-    """, height=0)
-
 # --- Fetch DXY Data ---
 def fetch_dxy_data():
     try:
