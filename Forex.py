@@ -220,7 +220,9 @@ for label, symbol in symbols.items():
     if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
     if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
     if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
-        pattern = detect_candle_pattern(df)
+    if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
+        pattern = detect_candle_pattern(df)  # ⛔️ YAHAN GALAT INDENTATION HAI
+
     if pattern: indicators.append("Candle")
 
     divergence = detect_divergence(df)
