@@ -222,14 +222,21 @@ for label, symbol in symbols.items():
     if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
     pattern = detect_candle_pattern(df)
     if pattern: indicators.append("Candle")
+    for label, symbol in symbols.items():
+    ...
     divergence = detect_divergence(df)
-if divergence:
-    indicators.append("Divergence")
-    play_rsi_alert()  # 🔔 Alert on divergence detection
+    if divergence:
+        indicators.append("Divergence")
+        play_rsi_alert()
 
     suggestion = generate_ai_suggestion(price, indicators, atr, signal_type)
     if not suggestion:
-        continue  # <- ✅ this is only valid inside this loop
+        continue  # ✅ NOW it's inside the loop
+
+    rows.append({
+        ...
+    })
+
     ...
 
     rows.append({
