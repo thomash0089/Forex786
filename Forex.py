@@ -220,24 +220,13 @@ for label, symbol in symbols.items():
     if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
     if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
     if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
-    pattern = detect_candle_pattern(df)
+        pattern = detect_candle_pattern(df)
     if pattern: indicators.append("Candle")
-    for label, symbol in symbols.items():
-    ...
+
     divergence = detect_divergence(df)
     if divergence:
         indicators.append("Divergence")
         play_rsi_alert()
-
-    suggestion = generate_ai_suggestion(price, indicators, atr, signal_type)
-    if not suggestion:
-        continue  # ✅ NOW it's inside the loop
-
-    rows.append({
-        ...
-    })
-
-    ...
 
     rows.append({
         "Pair": label, "Price": round(price, 5), "RSI": round(rsi_val, 2),
