@@ -254,7 +254,7 @@ for label, symbol in symbols.items():
     "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None and dxy_change is not None else "—"
 })
 
-column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
+column_order = ["Pair", "Price", "RSI 5M", "RSI 15 M": "", "RSI 1H": "", "RSI 4H": "", "ATR", "ATR Status", "Trend 5m", "Trend Daily", "Reversal Signal",
                 "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion",
                 "DXY Impact", ]
 
