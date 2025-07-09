@@ -212,15 +212,11 @@ for label, symbol in symbols.items():
     price = df["close"].iloc[-1]
     atr = df["ATR"].iloc[-1]
     trend = "Bullish" if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1] else "Bearish" if df["EMA9"].iloc[-1] < df["EMA20"].iloc[-1] and price < df["EMA9"].iloc[-1] else "Sideways"
-
     rsi_val = df["RSI"].iloc[-1]
-
     indicators = []
     signal_type = ""
-    if rsi_val > 50:
-        indicators.append("Bullish"); signal_type = "Bullish"
-    elif rsi_val < 50:
-        indicators.append("Bearish"); signal_type = "Bearish"
+    if rsi_val > 50: indicators.append("Bullish"); signal_type = "Bullish"
+    elif rsi_val < 50: indicators.append("Bearish"); signal_type = "Bearish"
     if df["MACD"].iloc[-1] > df["MACD_Signal"].iloc[-1]: indicators.append("MACD")
     if df["EMA9"].iloc[-1] > df["EMA20"].iloc[-1] and price > df["EMA9"].iloc[-1]: indicators.append("EMA")
     if df["ADX"].iloc[-1] > 20: indicators.append("ADX")
@@ -238,11 +234,12 @@ for label, symbol in symbols.items():
         "Trend": trend, "Reversal Signal": detect_trend_reversal(df),
         "Signal Type": signal_type, "Confirmed Indicators": ", ".join(indicators),
         "Candle Pattern": pattern or "—", "AI Suggestion": suggestion,
-        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None else "—"
+        "DXY Impact": f"{dxy_price:.2f} ({dxy_change:+.2f}%)" if "USD" in label and dxy_price is not None else "—",
+        "Divergence": divergence or "—"
     })
 
 column_order = ["Pair", "Price", "RSI", "ATR", "ATR Status", "Trend", "Reversal Signal",
-                "Signal Type", "Confirmed Indicators", "Candle Pattern", "AI Suggestion",
+                "Signal Type", "Confirmed Indicators", "Candle Pattern", "Divergence", "AI Suggestion",
                 "DXY Impact"]
 
 df_result = pd.DataFrame(rows)
@@ -273,6 +270,9 @@ for _, row in df_sorted.iterrows():
         elif col == "DXY Impact" and row["DXY Impact"] != "—":
             dxy_color = "green" if '+' in row["DXY Impact"] else "red"
             val = f"<span style='color:{dxy_color}; font-weight:bold;'>{row['DXY Impact']}</span>"
+        elif col == "Divergence" and row["Divergence"] != "—":
+            div_color = "green" if "Bullish" in row["Divergence"] else "red"
+            val = f"<span style='color:{div_color}; font-weight:bold;'>{row['Divergence']}</span>"
         styled_html += f"<td style='border:1px solid #ccc; padding:6px; white-space:pre-wrap;'>{val}</td>"
     styled_html += "</tr>"
 
